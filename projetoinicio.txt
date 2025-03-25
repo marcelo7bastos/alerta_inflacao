@@ -1,0 +1,18 @@
+# Projeto: Alerta de Inflação de Alimentos
+
+O projeto tem como objetivo ajudar a responsável a detectar rapidamente notícias na mídia que apontem para a inflação de alimentos, possibilitando uma resposta rápida de autoridades. A ideia é monitorar fontes de notícias confiáveis para identificar automaticamente matérias relevantes com palavras-chave específicas.
+
+## Funcionalidades do Sistema
+
+1. **Detecção de Notícias**  
+    Quando uma notícia é detectada, o sistema consulta dados oficiais para analisar a variação de preços de curto e longo prazo dos alimentos citados.
+
+2. **Análise de Produção**  
+    É verificada a participação de pequenos produtores na produção desses alimentos, e o sistema integra informações de estudos técnicos de instituições especializadas.
+
+3. **Geração de Relatórios**  
+    O sistema gera um relatório detalhado com gráficos e análises sobre a inflação do alimento, salva esse relatório em um serviço de armazenamento em nuvem e envia um alerta por aplicativos de mensagens.
+
+## Benefícios
+
+Essa solução permite que a responsável se posicione rapidamente diante de questões críticas, agregando dados de diferentes fontes em um único fluxo de informação.
