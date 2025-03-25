@@ -71,16 +71,37 @@ keywords = list(set(default_keywords + additional_keywords))
 # ======================
 # 5) Lista de Feeds
 # ======================
+# Lista de feeds RSS para monitorar (adicionar/remover conforme necessário)]
 rss_feeds = [
-    'https://g1.globo.com/rss/g1/',
-    'https://feeds.folha.uol.com.br/emcimadahora/rss091.xml',
-    'https://www.bbc.com/portuguese/index.xml',
-    'https://exame.com/feed/',
-    'https://www.cartacapital.com.br/feed/',
-    'https://www.istoedinheiro.com.br/feed/',
-    'https://www.infomoney.com.br/feed/',
-    'https://www.jovempan.com.br/feed',
-    'https://economia.ig.com.br/rss.xml',
+    # Feeds funcionando corretamente:
+    'https://g1.globo.com/rss/g1/',  # Portal de notícias da Globo, ampla cobertura nacional, política, economia e cotidiano.
+    'https://feeds.folha.uol.com.br/emcimadahora/rss091.xml',  # Folha de S.Paulo, jornal com ampla cobertura em política, economia e sociedade.
+    'https://www.bbc.com/portuguese/index.xml',  # Versão em português da BBC, com ampla cobertura internacional e local.
+    'https://exame.com/feed/',  # Revista Exame, especializada em economia, negócios e investimentos.
+    'https://www.cartacapital.com.br/feed/',  # Carta Capital, revista focada em política, economia e sociedade.
+    'https://www.istoedinheiro.com.br/feed/',  # Revista especializada em economia e negócios.
+    'https://www.infomoney.com.br/feed/',  # Site especializado em economia, mercado financeiro e investimentos.
+    'https://www.jovempan.com.br/feed',  # Portal da Rádio Jovem Pan, com cobertura em tempo real sobre política, economia e cotidiano.
+    'https://economia.ig.com.br/rss.xml',  # Portal iG, notícias gerais com foco em economia e negócios.
+
+    # # Feeds sem itens (provável sitemap ou estrutura não compatível):
+    # 'https://www.cnnbrasil.com.br/sitemap-news.xml',  # CNN Brasil, notícias rápidas e cobertura internacional.
+    # 'https://oglobo.globo.com/rss.xml',  # Jornal O Globo, notícias nacionais, internacionais, política e economia.
+
+    # # Feeds com erro de parsing (XML inválido):
+    # 'https://rss.uol.com.br/feed/noticias.xml',  # Portal UOL, um dos maiores portais com notícias gerais e economia.
+    # 'https://www.terra.com.br/rss/Controller?channelid=3d5d59942b25e410VgnVCM10000098cceb0aRCRD&ctName=atomo-noticia',  # Portal Terra, notícias gerais, economia e cotidiano.
+
+    # # Feeds com status HTTP 404 (não encontrados):
+    # 'https://www.estadao.com.br/rss/ultimas.xml',  # O Estado de S. Paulo, tradicional jornal brasileiro focado em política e economia.
+    # 'https://noticias.r7.com/feed.xml',  # Portal da Record com notícias gerais, economia e política.
+    # 'https://brasil.elpais.com/rss/brasil/portada.xml',  # Versão brasileira do jornal espanhol El País, com foco em análise política.
+    # 'https://veja.abril.com.br/rss.xml',  # Revista Veja, foco em política, economia e atualidades.
+    # 'https://epocanegocios.globo.com/rss/ultimas/feed.xml',  # Época Negócios, revista de negócios e economia.
+    # 'https://www.correiobraziliense.com.br/rss/noticia-brasil.xml',  # Correio Braziliense, jornal tradicional de Brasília com foco político e econômico.
+
+    # # Feeds com falha de conexão:
+    # 'https://www.valor.globo.com/rss',  # Valor Econômico, especializado em economia, mercados financeiros e negócios.
 ]
 
 # ======================
@@ -156,16 +177,33 @@ footer {
     font-size: 14px;
     color: #666;
 }
+.icon {
+    width: 20px;
+    height: 20px;
+    vertical-align: middle;
+    margin-right: 5px;
+    border-radius: 4px; /* Borda levemente arredondada */
+}
 </style>
 
 <div class="custom-footer">
     Feito por <strong>Marcelo Cabreira Bastos</strong> | 
     Contato: <a href="mailto:marcelo.cabreira@mda.gov.br">marcelo.cabreira@mda.gov.br</a> | 
-    <a href="https://www.linkedin.com/in/marcelo-cabreira-bastos/" target="_blank">LinkedIn</a>
+    <a href="https://www.linkedin.com/in/marcelo-cabreira-bastos/" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/174/174857.png" alt="LinkedIn" class="icon">
+        LinkedIn
+    </a> |
+    <a href="https://api.whatsapp.com/send?phone=5561981983931" target="_blank">
+        <img src="https://cdn-icons-png.flaticon.com/512/124/124034.png" alt="WhatsApp" class="icon">
+        WhatsApp
+    </a>
 </div>
 """
 
+import streamlit as st
 st.markdown(footer_html, unsafe_allow_html=True)
+
+
 
 
 
