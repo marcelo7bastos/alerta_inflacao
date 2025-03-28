@@ -1,7 +1,17 @@
 # app.py
 import streamlit as st
 import pandas as pd
-from backend import load_keywords_from_csv, get_default_keywords, search_keywords_in_rss
+from backend import load_keywords_from_csv, get_default_keywords, search_keywords_in_rss, classificar_artigo
+
+######## Preparação para uso da OpenAI
+import openai
+# Acesse a chave usando st.secrets
+openai.api_key = st.secrets["openai"]["api_key"]
+# Se preferir, você pode definir um alias:
+client = openai
+########
+
+
 
 # ======================
 # 1) Função de nome de veículo
@@ -117,14 +127,28 @@ if st.button("🔍 Buscar Notícias"):
 
     # 3) Faz a busca
     resultados = search_keywords_in_rss(rss_feeds, keywords)
+    #teste: cortar para 5 resultados
+    #resultados = resultados[:5]
+    #st.write("Estrutura dos artigos:", resultados)
+
+    #3.1) Aprimorares os resultados com a OpenAI
+    for item in resultados:
+        item = classificar_artigo(item)
+    #st.write("Artigos aprimorados:", resultados)
+            
+
 
     # 4) Remove a mensagem de "Buscando..."
     message_placeholder.empty()
 
     # 5) Mostra os resultados
-
     if resultados:
-        st.success(f"Foram encontradas {len(resultados)} notícia(s) relevantes.")
+        total = len(resultados)
+        filtered_count = sum(1 for artigo in resultados if artigo.get("1. O artigo aborda o tema da inflação?") == "Sim")
+        st.success(
+            f"Encontramos {total} notícias relevantes e nossa IA selecionou com precisão as {filtered_count} que realmente abordam a inflação de alimentos!\n"
+             "Confira nossa curadoria inteligente e fique por dentro das principais tendências."
+        )
 
         # ======================
         # 6a) Agrupar por veículo
@@ -136,23 +160,28 @@ if st.button("🔍 Buscar Notícias"):
                 grouped_results[feed_name] = []
             grouped_results[feed_name].append(item)
 
-        # ======================
-        # 6b) Exibir de forma organizada
-        # ======================
-        for feed_name, items in grouped_results.items():
-            # Cria uma seção recolhível para cada veículo
-            with st.expander(feed_name, expanded=False):
-                # Dentro do expander, listamos cada notícia
-                for i in items:
+    # ======================
+    # 6b) Exibir de forma organizada
+    # ======================
+    for feed_name, items in grouped_results.items():
+        with st.expander(feed_name, expanded=False):
+            found = False  # Flag para verificar se pelo menos um item foi exibido
+            for i in items:
+                # Apenas exibe se a resposta à pergunta 1 for "Sim"
+                if i.get("1. O artigo aborda o tema da inflação?") == "Sim":
+                    found = True
                     st.markdown(f"**Título:** {i['title']}")
                     st.write(f"Link: {i['link']}")
                     st.write(f"Fonte: {i['feed_url']}")
                     st.write(f"Data de publicação: {i['pub_date']}")
                     st.write(f"Palavra-chave: {i['matched_keyword']}")
-                    st.write("---")  # Separador
-
-    else:
-        st.warning("Nenhuma notícia encontrada com as palavras-chave fornecidas.")
+                    st.write(f"1. O artigo aborda o tema da inflação? {i['1. O artigo aborda o tema da inflação?']}")
+                    st.write(f"2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral? {i['2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral?']}")
+                    st.write(f"3. O artigo aborda especificamente a inflação de alimentos? {i['3. O artigo aborda especificamente a inflação de alimentos?']}")
+                    st.write(f"4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor? {i['4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor?']}")
+                    st.write("---")  # Separador visual
+            if not found:
+                st.warning("Nenhuma notícia sobre inflação de alimentos encontrada.")
 
 
 # ======================

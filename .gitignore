@@ -5,3 +5,5 @@ venv/
 # Arquivos do Python
 __pycache__/
 *.pyc
+
+.streamlit
