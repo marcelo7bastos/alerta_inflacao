@@ -1,3 +1,8 @@
+
+Anotações:
+.\venv\Scripts\Activate.ps1 
+
+
 # Projeto: Alerta de Inflação de Alimentos
 
 O projeto tem como objetivo ajudar a responsável a detectar rapidamente notícias na mídia que apontem para a inflação de alimentos, possibilitando uma resposta rápida de autoridades. A ideia é monitorar fontes de notícias confiáveis para identificar automaticamente matérias relevantes com palavras-chave específicas.
@@ -17,9 +22,6 @@ O projeto tem como objetivo ajudar a responsável a detectar rapidamente notíci
 
 Essa solução permite que a responsável se posicione rapidamente diante de questões críticas, agregando dados de diferentes fontes em um único fluxo de informação.
 
-
-Anotações:
-.\venv\Scripts\Activate.ps1 
 
 
 
