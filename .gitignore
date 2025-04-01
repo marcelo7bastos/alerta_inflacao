@@ -8,3 +8,6 @@ __pycache__/
 *.pyc
 
 .streamlit
+
+# Arquivos Excel de teste
+data\noticias\teste_analise_resultados.xlsx

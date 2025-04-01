@@ -1,26 +1,18 @@
-# app.py
 import streamlit as st
 import pandas as pd
+import os
 from backend import load_keywords_from_csv, get_default_keywords, search_keywords_in_rss, classificar_artigo
 
 ######## Preparação para uso da OpenAI
 import openai
-# Acesse a chave usando st.secrets
 openai.api_key = st.secrets["openai"]["api_key"]
-# Se preferir, você pode definir um alias:
 client = openai
 ########
-
-
 
 # ======================
 # 1) Função de nome de veículo
 # ======================
 def get_feed_name(feed_url: str) -> str:
-    """
-    Dado um feed_url, retorna um nome amigável do veículo de imprensa.
-    Ajuste as condições conforme necessário.
-    """
     feed_url_lower = feed_url.lower()
     if "g1.globo.com" in feed_url_lower:
         return "G1"
@@ -41,27 +33,28 @@ def get_feed_name(feed_url: str) -> str:
     elif "ig.com.br" in feed_url_lower:
         return "IG Economia"
     else:
-        # Se não identificar, retorna a própria URL
         return feed_url
 
 # ======================
-# 2) Configuração e título
+# 2) Configuração e título do app
 # ======================
 st.set_page_config(page_title="Monitor de Notícias sobre Inflação de Alimentos", layout="wide")
 st.title("📰 Monitor de Notícias - Inflação de Alimentos")
 
 # ======================
-# 3) Sidebar (Descrição do projeto)
+# 3) Sidebar: Descrição do projeto e escolha de tela
 # ======================
 st.sidebar.markdown(
     """
     ## Sobre o Projeto
-
     Este aplicativo monitora notícias sobre inflação de alimentos a partir de diversos feeds RSS.
     Utilizando um conjunto de palavras-chave, o sistema filtra e exibe somente as notícias relevantes 
     para que você acompanhe as principais atualizações do setor.
     """
 )
+
+# Seletor de tela
+pagina = st.sidebar.radio("Selecione a tela", ["Monitor de Notícias", "Histórico de Inflação"])
 
 # ======================
 # 4) Carregando as keywords
@@ -69,152 +62,172 @@ st.sidebar.markdown(
 csv_path = "data/keywords/ipca_alimentacao_bebidas.csv"
 try:
     additional_keywords = load_keywords_from_csv(csv_path)
-    #st.sidebar.info("Palavras-chave carregadas com sucesso!")
 except Exception as e:
-    #st.sidebar.error(f"Erro ao carregar palavras-chave: {e}")
     additional_keywords = []
 
 default_keywords = get_default_keywords()
 keywords = list(set(default_keywords + additional_keywords))
-#st.sidebar.write("Palavras-chave utilizadas:", keywords)
 
 # ======================
 # 5) Lista de Feeds
 # ======================
-# Lista de feeds RSS para monitorar (adicionar/remover conforme necessário)]
 rss_feeds = [
-    # Feeds funcionando corretamente:
-    'https://g1.globo.com/rss/g1/',  # Portal de notícias da Globo, ampla cobertura nacional, política, economia e cotidiano.
-    'https://feeds.folha.uol.com.br/emcimadahora/rss091.xml',  # Folha de S.Paulo, jornal com ampla cobertura em política, economia e sociedade.
-    'https://www.bbc.com/portuguese/index.xml',  # Versão em português da BBC, com ampla cobertura internacional e local.
-    'https://exame.com/feed/',  # Revista Exame, especializada em economia, negócios e investimentos.
-    'https://www.cartacapital.com.br/feed/',  # Carta Capital, revista focada em política, economia e sociedade.
-    'https://www.istoedinheiro.com.br/feed/',  # Revista especializada em economia e negócios.
-    'https://www.infomoney.com.br/feed/',  # Site especializado em economia, mercado financeiro e investimentos.
-    'https://www.jovempan.com.br/feed',  # Portal da Rádio Jovem Pan, com cobertura em tempo real sobre política, economia e cotidiano.
-    'https://economia.ig.com.br/rss.xml',  # Portal iG, notícias gerais com foco em economia e negócios.
-
-    # # Feeds sem itens (provável sitemap ou estrutura não compatível):
-    # 'https://www.cnnbrasil.com.br/sitemap-news.xml',  # CNN Brasil, notícias rápidas e cobertura internacional.
-    # 'https://oglobo.globo.com/rss.xml',  # Jornal O Globo, notícias nacionais, internacionais, política e economia.
-
-    # # Feeds com erro de parsing (XML inválido):
-    # 'https://rss.uol.com.br/feed/noticias.xml',  # Portal UOL, um dos maiores portais com notícias gerais e economia.
-    # 'https://www.terra.com.br/rss/Controller?channelid=3d5d59942b25e410VgnVCM10000098cceb0aRCRD&ctName=atomo-noticia',  # Portal Terra, notícias gerais, economia e cotidiano.
-
-    # # Feeds com status HTTP 404 (não encontrados):
-    # 'https://www.estadao.com.br/rss/ultimas.xml',  # O Estado de S. Paulo, tradicional jornal brasileiro focado em política e economia.
-    # 'https://noticias.r7.com/feed.xml',  # Portal da Record com notícias gerais, economia e política.
-    # 'https://brasil.elpais.com/rss/brasil/portada.xml',  # Versão brasileira do jornal espanhol El País, com foco em análise política.
-    # 'https://veja.abril.com.br/rss.xml',  # Revista Veja, foco em política, economia e atualidades.
-    # 'https://epocanegocios.globo.com/rss/ultimas/feed.xml',  # Época Negócios, revista de negócios e economia.
-    # 'https://www.correiobraziliense.com.br/rss/noticia-brasil.xml',  # Correio Braziliense, jornal tradicional de Brasília com foco político e econômico.
-
-    # # Feeds com falha de conexão:
-    # 'https://www.valor.globo.com/rss',  # Valor Econômico, especializado em economia, mercados financeiros e negócios.
+    'https://g1.globo.com/rss/g1/',
+    'https://feeds.folha.uol.com.br/emcimadahora/rss091.xml',
+    'https://www.bbc.com/portuguese/index.xml',
+    'https://exame.com/feed/',
+    'https://www.cartacapital.com.br/feed/',
+    'https://www.istoedinheiro.com.br/feed/',
+    'https://www.infomoney.com.br/feed/',
+    'https://www.jovempan.com.br/feed',
+    'https://economia.ig.com.br/rss.xml',
 ]
 
 # ======================
-# 6) Botão para buscar notícias
+# Tela: Monitor de Notícias
 # ======================
+if pagina == "Monitor de Notícias":
+    if st.button("🔍 Buscar Notícias"):
+        message_placeholder = st.empty()
+        message_placeholder.info("Buscando notícias, por favor aguarde...")
 
-if st.button("🔍 Buscar Notícias"):
-    # 1) Placeholder para mensagens
-    message_placeholder = st.empty()
-
-    # 2) Mensagem inicial
-    message_placeholder.info("Buscando notícias, por favor aguarde...")
-
-    # 3) Faz a busca
-    resultados = search_keywords_in_rss(rss_feeds, keywords)
-    #teste: cortar para 5 resultados
-    #resultados = resultados[:5]
-    #st.write("Estrutura dos artigos:", resultados)
-
-    #3.1) Aprimorares os resultados com a OpenAI
-    for item in resultados:
-        item = classificar_artigo(item)
-    #st.write("Artigos aprimorados:", resultados)
-            
-
-
-    # 4) Remove a mensagem de "Buscando..."
-    message_placeholder.empty()
-
-    # 5) Mostra os resultados
-    if resultados:
-        total = len(resultados)
-        filtered_count = sum(1 for artigo in resultados if artigo.get("1. O artigo aborda o tema da inflação?") == "Sim")
-        st.success(
-            f"Encontramos {total} notícias relevantes e nossa IA selecionou com precisão as {filtered_count} que realmente abordam a inflação de alimentos!\n"
-             "Confira nossa curadoria inteligente e fique por dentro das principais tendências."
-        )
-
-        # ======================
-        # 6a) Agrupar por veículo
-        # ======================
-        grouped_results = {}
+        resultados = search_keywords_in_rss(rss_feeds, keywords)
+        # Chamada da classificação para aprimorar os artigos
         for item in resultados:
-            feed_name = get_feed_name(item['feed_url'])
-            if feed_name not in grouped_results:
-                grouped_results[feed_name] = []
-            grouped_results[feed_name].append(item)
+            item = classificar_artigo(item)
+        
+        message_placeholder.empty()
 
-    # ======================
-    # 6b) Exibir de forma organizada
-    # ======================
-    for feed_name, items in grouped_results.items():
-        with st.expander(feed_name, expanded=False):
-            found = False  # Flag para verificar se pelo menos um item foi exibido
-            for i in items:
-                # Apenas exibe se a resposta à pergunta 1 for "Sim"
-                if i.get("1. O artigo aborda o tema da inflação?") == "Sim":
-                    found = True
-                    st.markdown(f"**Título:** {i['title']}")
-                    st.write(f"Link: {i['link']}")
-                    st.write(f"Fonte: {i['feed_url']}")
-                    st.write(f"Data de publicação: {i['pub_date']}")
-                    st.write(f"Palavra-chave: {i['matched_keyword']}")
-                    st.write(f"1. O artigo aborda o tema da inflação? {i['1. O artigo aborda o tema da inflação?']}")
-                    st.write(f"2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral? {i['2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral?']}")
-                    st.write(f"3. O artigo aborda especificamente a inflação de alimentos? {i['3. O artigo aborda especificamente a inflação de alimentos?']}")
-                    st.write(f"4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor? {i['4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor?']}")
-                    st.write("---")  # Separador visual
-            if not found:
-                st.warning("Nenhuma notícia sobre inflação de alimentos encontrada.")
+        if resultados:
+            total = len(resultados)
+            filtered_count = sum(1 for artigo in resultados if artigo.get("1. O artigo aborda o tema da inflação?") == "Sim")
+            st.success(
+                f"Encontramos {total} notícias relevantes e nossa IA selecionou com precisão as {filtered_count} que realmente abordam a inflação de alimentos!"
+            )
+            # Agrupamento por veículo
+            grouped_results = {}
+            for item in resultados:
+                feed_name = get_feed_name(item['feed_url'])
+                if feed_name not in grouped_results:
+                    grouped_results[feed_name] = []
+                grouped_results[feed_name].append(item)
+            # Exibe os resultados de forma organizada
+            for feed_name, items in grouped_results.items():
+                with st.expander(feed_name, expanded=False):
+                    found = False
+                    for i in items:
+                        if i.get("1. O artigo aborda o tema da inflação?") == "Sim":
+                            found = True
+                            st.markdown(f"**Título:** {i['title']}")
+                            st.write(f"Link: {i['link']}")
+                            st.write(f"Fonte: {i['feed_url']}")
+                            st.write(f"Data de publicação: {i['pub_date']}")
+                            st.write(f"Palavra-chave: {i['matched_keyword']}")
+                            st.write(f"1. O artigo aborda o tema da inflação? {i['1. O artigo aborda o tema da inflação?']}")
+                            st.write(f"2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral? {i['2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral?']}")
+                            st.write(f"3. O artigo aborda especificamente a inflação de alimentos? {i['3. O artigo aborda especificamente a inflação de alimentos?']}")
+                            st.write(f"4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor? {i['4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor?']}")
+                            st.write("---")
+                    if not found:
+                        st.warning("Nenhuma notícia sobre inflação de alimentos encontrada.")
+
+# ======================
+# Tela: Histórico de Inflação
+# ======================
+elif pagina == "Histórico de Inflação":
+    st.title("Histórico de Inflação")
+    csv_filepath = "data/noticias/noticias.csv"
+    
+    if os.path.exists(csv_filepath):
+        # Lê o CSV forçando todas as colunas como string
+        df = pd.read_csv(csv_filepath, dtype=str)
+
+        # ===========================
+        # 1) Filtrar apenas notícias onde a coluna 
+        #    "1. O artigo aborda o tema da inflação?" é "Sim"
+        # ===========================
+        col_inflacao = "1. O artigo aborda o tema da inflação?"
+        df = df[df[col_inflacao] == "Sim"]
+
+        # ===========================
+        # 2) Conversão de datas e ordenação decrescente
+        # ===========================
+        # Tenta converter a coluna pub_date para datetime
+        # Se houver datas em formato inconsistente, elas ficarão como NaT
+        # Converte a coluna pub_date para datetime, forçando UTC
+        df["pub_date"] = pd.to_datetime(df["pub_date"], errors="coerce", utc=True)
+
+        # # Converte de UTC para o fuso horário de São Paulo (UTC-3)
+        df["pub_date"] = df["pub_date"].dt.tz_convert("America/Sao_Paulo").dt.tz_localize(None)
+
+
+        # Ordena por pub_date (mais recentes primeiro)
+        df = df.sort_values(by="pub_date", ascending=False)
+
+        # ===========================
+        # 3) Filtros de data (início e fim)
+        # ===========================
+        # Sugere-se definir valores padrão adequados ao seu cenário
+        min_date = df["pub_date"].min()
+        max_date = df["pub_date"].max()
+
+        # Se min_date ou max_date forem NaT (caso não haja datas válidas), defina manualmente
+        if pd.isna(min_date):
+            min_date = pd.to_datetime("2023-01-01")
+        if pd.isna(max_date):
+            max_date = pd.to_datetime("today")
+
+        st.write("### Filtrar por data de publicação")
+        start_date = st.date_input("Data de Início", value=min_date.date())
+        end_date = st.date_input("Data de Fim", value=max_date.date())
+
+        if start_date > end_date:
+            st.warning("A data de início não pode ser maior que a data de fim.")
+        else:
+            # Aplica o filtro de datas
+            mask = (df["pub_date"].dt.date >= start_date) & (df["pub_date"].dt.date <= end_date)
+            df = df[mask]
+
+        # ===========================
+        # 4) Exibição em lista
+        # ===========================
+        st.write(f"Exibindo {len(df)} notícias filtradas:")
+
+        if len(df) == 0:
+            st.warning("Nenhuma notícia encontrada nesse intervalo de datas.")
+        else:
+            # Itera sobre o DataFrame e exibe cada notícia
+            for idx, row in df.iterrows():
+                with st.expander(f"{row['title']} ({row['pub_date']})", expanded=False):
+                    st.markdown(f"**Título:** {row['title']}")
+                    st.write(f"Data de publicação: {row['pub_date']}")
+                    st.write(f"Link: {row['link']}")
+                    st.write(f"Fonte: {row['feed_url']}")
+                    st.write(f"Palavra-chave: {row['matched_keyword']}")
+                    
+                    # Se quiser exibir também as outras respostas de classificação:
+                    st.write(f"2. Perspectiva positiva (inflação geral)? {row.get('2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral?', '')}")
+                    st.write(f"3. Aborda especificamente inflação de alimentos? {row.get('3. O artigo aborda especificamente a inflação de alimentos?', '')}")
+                    st.write(f"4. Perspectiva positiva (inflação alimentos)? {row.get('4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor?', '')}")
+
+    else:
+        st.error("Arquivo CSV de notícias não encontrado!")
 
 
 # ======================
-# 8) Rodapé 
+# 6) Rodapé
 # ======================
 footer_html = """
 <style>
-footer {
-    visibility: hidden; /* Esconde o footer padrão do Streamlit */
-}
-.main .block-container {
-    padding-bottom: 60px; /* Espaço extra para não sobrepor o conteúdo */
-}
+footer { visibility: hidden; }
+.main .block-container { padding-bottom: 60px; }
 .custom-footer {
-    position: fixed;
-    left: 0;
-    bottom: 0;
-    width: 100%;
-    background-color: #f2f2f2;
-    text-align: center;
-    padding: 10px 0;
-    font-size: 14px;
-    color: #666;
+    position: fixed; left: 0; bottom: 0; width: 100%;
+    background-color: #f2f2f2; text-align: center;
+    padding: 10px 0; font-size: 14px; color: #666;
 }
-.icon {
-    width: 20px;
-    height: 20px;
-    vertical-align: middle;
-    margin-right: 5px;
-    border-radius: 4px; /* Borda levemente arredondada */
-}
+.icon { width: 20px; height: 20px; vertical-align: middle; margin-right: 5px; border-radius: 4px; }
 </style>
-
 <div class="custom-footer">
     Feito por <strong>Marcelo Cabreira Bastos</strong> | 
     Contato: <a href="mailto:marcelo.cabreira@mda.gov.br">marcelo.cabreira@mda.gov.br</a> | 
@@ -228,14 +241,4 @@ footer {
     </a>
 </div>
 """
-
-import streamlit as st
 st.markdown(footer_html, unsafe_allow_html=True)
-
-
-
-
-
-
-
-
