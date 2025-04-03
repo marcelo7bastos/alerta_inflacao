@@ -2,7 +2,8 @@ import streamlit as st
 from backend.utils import render_footer
 
 st.set_page_config(
-    page_title="Monitor de Notícias - Inflação de Alimentos",
+    page_title="Início - Monitor de Notícias",
+    page_icon="🏠",  # emoji de casa, por exemplo
     layout="wide"
 )
 
