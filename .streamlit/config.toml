@@ -1,7 +1,4 @@
 [server]
 headless = true
 
-[runner]
-# Este parâmetro pode ser usado para especificar o arquivo principal.
-# Porém, vale notar que o Procfile costuma ter prioridade no Streamlit Cloud.
-main = "0_🏠 Início.py"
+
