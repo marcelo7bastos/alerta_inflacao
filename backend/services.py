@@ -4,9 +4,12 @@ import requests
 import xml.etree.ElementTree as ET
 import pandas as pd
 from typing import List, Dict, Any
+import streamlit as st
 
 ### Funcionamento da API da OpenAI
 import openai
+# Atribui a chave de API dos secrets do Streamlit
+openai.api_key = st.secrets["openai"]["api_key"]
 client = openai
 ###
 
@@ -167,6 +170,9 @@ def classificar_artigo(artigo):
         resposta_linha = linha.split('. ', 1)[-1].strip()
         chave_pergunta = list(perguntas.keys())[i - 1]
         perguntas[chave_pergunta] = resposta_linha
+    
+    #imprimir o resultado
+    print("Respostas:", perguntas)        
     
     # Apensa os resultados (as classificações) ao dicionário do artigo
     artigo.update(perguntas)
