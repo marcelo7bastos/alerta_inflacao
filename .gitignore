@@ -7,7 +7,9 @@ venv/
 __pycache__/
 *.pyc
 
-.streamlit
+#.streamlit
+.streamlit/secrets.toml
+*/secrets.toml
 
 # Arquivos Excel de teste
 data\noticias\teste_analise_resultados.xlsx
