@@ -1,5 +1,5 @@
 import streamlit as st
-from backend.backend import (
+from backend.services import (
     load_keywords_from_csv, 
     get_default_keywords, 
     search_keywords_in_rss, 
@@ -15,13 +15,13 @@ st.set_page_config(page_title="Monitor de Notícias - Inflação de Alimentos", 
 st.title("📰 Monitor de Notícias - Inflação de Alimentos")
 
 # Sidebar para descrição do projeto (caso queira manter)
-st.sidebar.markdown(
-    """
-    ## Sobre o Projeto
-    Este aplicativo monitora notícias sobre inflação de alimentos a partir de diversos feeds RSS.
-    Utilizando um conjunto de palavras-chave, o sistema filtra e exibe somente as notícias relevantes.
-    """
-)
+# st.sidebar.markdown(
+#     """
+#     ## Sobre o Projeto
+#     Este aplicativo monitora notícias sobre inflação de alimentos a partir de diversos feeds RSS.
+#     Utilizando um conjunto de palavras-chave, o sistema filtra e exibe somente as notícias relevantes.
+#     """
+# )
 
 # Carrega as keywords
 csv_path = "data/keywords/ipca_alimentacao_bebidas.csv"
