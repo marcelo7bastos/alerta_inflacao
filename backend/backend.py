@@ -173,3 +173,31 @@ def classificar_artigo(artigo):
     
     # Retorna apenas o dicionário do artigo, já atualizado com as classificações
     return artigo
+
+
+# ======================
+# 1) Função de nome de veículo
+# ======================
+def get_feed_name(feed_url: str) -> str:
+    feed_url_lower = feed_url.lower()
+    if "g1.globo.com" in feed_url_lower:
+        return "G1"
+    elif "folha.uol.com.br" in feed_url_lower:
+        return "Folha"
+    elif "bbc.com" in feed_url_lower:
+        return "BBC"
+    elif "exame.com" in feed_url_lower:
+        return "Exame"
+    elif "cartacapital.com.br" in feed_url_lower:
+        return "Carta Capital"
+    elif "istoedinheiro" in feed_url_lower:
+        return "IstoÉ Dinheiro"
+    elif "infomoney" in feed_url_lower:
+        return "InfoMoney"
+    elif "jovempan.com.br" in feed_url_lower:
+        return "Jovem Pan"
+    elif "ig.com.br" in feed_url_lower:
+        return "IG Economia"
+    else:
+        return feed_url
+
