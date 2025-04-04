@@ -207,3 +207,99 @@ def get_feed_name(feed_url: str) -> str:
     else:
         return feed_url
 
+
+
+##### Nuvem de palavras #####
+import pandas as pd
+import string
+from wordcloud import WordCloud
+import nltk
+from nltk.corpus import stopwords
+import os
+
+# Se ainda não baixou as stopwords do NLTK, descomente a linha abaixo:
+# nltk.download('stopwords')
+
+def carregar_stopwords(caminho: str) -> set:
+    """
+    Carrega as stopwords de um arquivo, onde cada linha contém uma palavra.
+    """
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            stopwords_lista = [linha.strip() for linha in f if linha.strip()]
+        return set(stopwords_lista)
+    except Exception as e:
+        raise ValueError("Erro ao carregar stopwords do arquivo: " + str(e))
+
+import pandas as pd
+import string
+from wordcloud import WordCloud
+import nltk
+from nltk.corpus import stopwords
+import numpy as np
+from PIL import Image
+
+
+# Stopwords padrão do NLTK para o português com complementos
+
+def gerar_nuvem_palavras(csv_path: str, stopwords_path: str = None, mask_path: str = None) -> WordCloud:
+    """
+    Lê o CSV, filtra os artigos que abordam a inflação, processa os textos
+    e gera uma WordCloud estilizada.
+    
+    Parâmetros:
+    - csv_path: caminho para o CSV de notícias.
+    - stopwords_path: caminho para um arquivo de stopwords customizado (opcional).
+    - mask_path: caminho para uma imagem que servirá de máscara para a nuvem (opcional).
+    
+    Retorna:
+    - Um objeto WordCloud.
+    """
+    # Lê o CSV
+    df = pd.read_csv(csv_path, dtype=str)
+    
+    if "1. O artigo aborda o tema da inflação?" not in df.columns:
+        raise ValueError("Coluna '1. O artigo aborda o tema da inflação?' não encontrada no CSV.")
+    
+    # Filtra os artigos relevantes
+    df_filtrado = df[df["1. O artigo aborda o tema da inflação?"] == "Sim"]
+    
+    # Extrai textos (títulos e, se disponível, descrições)
+    textos = df_filtrado["title"].tolist()
+    if "description" in df_filtrado.columns:
+        textos += df_filtrado["description"].dropna().tolist()
+    
+    texto_completo = " ".join(textos).lower()
+    texto_sem_pontuacao = texto_completo.translate(str.maketrans("", "", string.punctuation))
+    
+    # Carrega as stopwords customizadas, se o caminho for fornecido, ou usa as do NLTK
+    if stopwords_path and os.path.exists(stopwords_path):
+        stopwords_pt = carregar_stopwords(stopwords_path)
+    else:
+        stopwords_pt = set(stopwords.words('portuguese'))
+    
+    palavras_filtradas = [palavra for palavra in texto_sem_pontuacao.split() if palavra not in stopwords_pt]
+    texto_final = " ".join(palavras_filtradas)
+    
+    # Se for fornecida uma máscara, carrega-a; caso contrário, mask fica como None
+    mask = None
+    if mask_path and os.path.exists(mask_path):
+        mask = np.array(Image.open(mask_path))
+    
+    # Cria a nuvem de palavras com personalizações estéticas
+    wordcloud = WordCloud(
+        width=800,
+        height=400,
+        background_color='white',  # ou None se preferir fundo transparente
+        colormap='Reds',
+        mask=mask,
+        contour_width=1,
+        contour_color='steelblue',
+        collocations=False
+    ).generate(texto_final)
+    
+    return wordcloud
+
+
+##### Nuvem de palavras #####
+# ======================
