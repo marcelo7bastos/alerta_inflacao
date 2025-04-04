@@ -11,12 +11,16 @@ st.set_page_config(
 )
 
 # Mensagem inicial (opcional)
-st.title("Bem-vindo ao Monitor de Notícias sobre Inflação de Alimentos!")
+st.title("Monitor de Notícias sobre Inflação de Alimentos!")
+# st.markdown("""
+# Utilize o menu à esquerda para navegar entre as páginas:
+# - **Histórico de Notícias:** Consulte o histórico filtrado das notícias sobre inflação de alimentos.
+# - **Monitor de Notícias:** Busque e visualize notícias atualizadas em tempo real. 
+# """)
 st.markdown("""
 Utilize o menu à esquerda para navegar entre as páginas:
-- **Histórico de Notícias:** Consulte o histórico filtrado das notícias sobre inflação de alimentos.
-- **Monitor de Notícias:** Busque e visualize notícias atualizadas em tempo real. 
 """)
+
 
 
 #### Nuvem de palavras
@@ -36,8 +40,21 @@ try:
     st.pyplot(fig)
 except Exception as e:
     st.error("Erro ao gerar a nuvem de palavras: " + str(e))
+#### Fim da nuvem de palavras
 
+#### Sidebar
+# Sidebar para descrição do projeto (caso queira manter)
+st.sidebar.markdown(
+    """
+    ## Sobre o Projeto
+    Este aplicativo monitora notícias sobre inflação de alimentos a partir de diversos feeds RSS.
+    Utilizando um conjunto de palavras-chave, o sistema filtra as notícias. 
+    Em seguida, um modelo de linguagem natura (LLM) classifica as notícias.
+    Por fim, a aplicação exibe somente as notícias relevantes.
+    """
+)
 
+### Fim da sidebar
 
 # Exibe o rodapé chamando a função
 render_footer()
