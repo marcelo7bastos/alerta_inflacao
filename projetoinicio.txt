@@ -1,8 +1,12 @@
 
-Anotações:
+##### Anotações:
+venv\Scripts\activate
 python .\backend\atualiza_noticias.py   
+git add . 
+git commit -m "atualização de dados 20250407"
+git push 
 
-
+###############
 
 # Projeto: Alerta de Inflação de Alimentos
 
