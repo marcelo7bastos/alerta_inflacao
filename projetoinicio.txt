@@ -1,6 +1,7 @@
 
 Anotações:
-.\venv\Scripts\Activate.ps1 
+python .\backend\atualiza_noticias.py   
+
 
 
 # Projeto: Alerta de Inflação de Alimentos
