@@ -3,7 +3,7 @@
 venv\Scripts\activate
 python .\backend\atualiza_noticias.py   
 git add . 
-git commit -m "atualização de dados 20250407"
+git commit -m "atualização de dados 20250409"
 git push 
 
 ###############
