@@ -1,0 +1,37 @@
+Considerando:
+
+Os dados de SICOR_SALDOS
+# Dicionário com as conversões recomendadas para cada variável
+conversoes_sicor = {
+    'REF_BACEN'              : 'str',      # Código Bacen (manter como string, preservando zeros à esquerda)
+    'NU_ORDEM'               : 'str',      # Número de ordem (identificador, trata-se como string)
+    'ANO_BASE'               : 'Int64',    # Ano de referência (ex.: 2022), int que pode ter NA
+    'MES_BASE'               : 'Int64',    # Mês de referência (1–12), int que pode ter NA
+    'VL_MEDIO_DIARIO_VINCENDO': 'float64', # Valor médio diário vincendo (valor monetário)
+    'VL_ULTIMO_DIA'          : 'float64',  # Valor do último dia (valor monetário)
+    'VL_MEDIO_DIARIO'        : 'float64',  # Valor médio diário (valor monetário)
+    'CD_SITUACAO_OPERACAO'    : 'category'  # Código da situação da operação (usar category para códigos)
+}
+
+# Para aplicar essas conversões:
+df_sicor = df_sicor.astype(conversoes_sicor)
+
+
+# Verifique:
+print(df_sicor.dtypes)
+
+
+Eos dados do PRONAF:
+df_pre_process_subprogramas.columns 
+
+Index(['REF_BACEN', 'NU_ORDEM', 'CNPJ_IF', 'DT_EMISSAO', 'CD_INST_CREDITO',
+       'CD_ESTADO', 'VL_JUROS', 'VL_PARC_CREDITO', 'CD_SUBPROGRAMA', 'ANO',
+       'CD_CPF_CNPJ', 'SEXO_BIOLOGICO', 'DESCRICAO_SUBPROGRAMA'],
+      dtype='object')
+
+
+Eu preciso criar um novo dataframe que tenha na esquerda todos os dados de df_sicor e na direita entre os dados encontrados de df_pre_process_subprogramas
+
+A chave é composta em ambos os lados por 'REF_BACEN' E'NU_ORDEM'
+
+crie o script e explique

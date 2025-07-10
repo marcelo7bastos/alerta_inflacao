@@ -1,0 +1,53 @@
+Você é meu colega de trabalho e é especialista e professor de banco de dados, modelo entidade relacionamento.
+
+Nós estamos desenvolvendo uma POC para apresentar uma ideia de banco de dados para outros colegas do ministério que não conhecem nada do programa e nem de base de dados.
+
+Nossa POC se refere a criar um banco de dados na terceira forma normal com 10 tabelas utilizando os dados de https://www.bcb.gov.br/estabilidadefinanceira/creditorural
+
+
+Mais sobre o programa:
+Crédito Rural
+O crédito rural é o financiamento destinado ao segmento rural. Os produtores rurais utilizam os recursos concedidos pelas instituições financeiras nessa linha de crédito de diversas maneiras na sua propriedade. Por exemplo, podem investir em novos equipamentos e animais ou custear matéria prima para o cultivo. Podem ainda utilizar esses recursos para comercializar e industrializar a produção. São as chamadas finalidades do crédito rural.
+
+Quais as finalidades do crédito rural?
+As finalidades do crédito rural podem ser descritas como:
+
+Crédito de custeio – destina-se a cobrir despesas normais dos ciclos produtivos, da compra de insumos à fase de colheita.
+Crédito de investimento – destina-se a aplicações em bens ou serviços cujo benefício se estenda por vários períodos de produção. Por exemplo na aquisição de um trator.
+Crédito de comercialização – destina-se a viabilizar ao produtor rural ou às cooperativas os recursos necessários à comercialização de seus produtos no mercado.
+Crédito de industrialização – destina-se à industrialização de produtos agropecuários, quando efetuada por cooperativas ou pelo produtor na sua propriedade rural.
+Você sabe de onde vem esse dinheiro que o banco empresta para o produtor rural? As principais fontes do crédito rural são:
+
+Depósitos à vista
+Depósitos de poupança rural
+Emissão de Letras de Crédito do Agronegócio (LCA)
+Fontes fiscais: BNDES e Fundos Constitucionais
+Recursos próprios das Instituições Financeiras
+
+
+Pensei na seguinte estrutura de trabalho:
+Estrutura do trabalho: 
+1) Introdução 
+A introdução deve ter uma explicação do domínio abordado. 
+2) Requisitos Funcionais 
+Essa seção deve apresentar os requisitos funcionais do base de dados do 
+projeto. 
+3) Modelo Conceitual/Lógico 
+Essa seção deve apresentar o modelo conceitual/lógico da base de dados 
+do projeto. 
+4) Base de dados criada e carregada com dados em um SGBD 
+Essa seção deve ter a DDL (script) de criação da base de dados e o print 
+screen das tabelas carregadas com dados. 
+5) Consultas SQL 
+Essa seção deve ter cinco consultas em linguagem natural, em linguagem 
+SQL e o print screen do resultado da execução na base de dados do 
+projeto.   
+
+Você vai realizar as seguintes etapas com muita atenção e reflexão:
+1) Introdução: crie uma introdução de, no máximo, 2000 caracteres;
+2) Requisitos Funcionais: crie os requisitos funcionais considerando o diagrama apresentado
+3) Modelo Conceitual/Lógico: avalie criticamente, apontando pontos de melhoria considerando o diagrama apresentado
+4) Base de dados criada e carregada com dados em um SGBD: essa etapa ainda será implementada, apenas aponte os pontos de atenção
+5) Em linguagem natural, sugira 10 consultas possíveis de serem feitas considerando o diagrama apresentado
+
+

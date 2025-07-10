@@ -1,0 +1,14 @@
+Vamos avançar na análise.
+A seguir tenho as colunas de interesse e o tipo
+
+    'CD_IBGE_CADASTRO': 'string',
+    'CO_FAMILIAR_FAM': 'string',
+    'MARC_PBF': 'category',
+    'CO_CHV_NATURAL_PESSOA': 'string',
+    'CO_EST_CADASTRAL_MEMB': 'category',
+    'NO_PESSOA': 'string',
+    'NU_CPF_PESSOA': 'string',
+    'DS_MARC_BPC': 'string'
+
+
+Qual é a melhor estratégia para criar um df_pessoa_selecao.parquet? 

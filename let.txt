@@ -1,0 +1,53 @@
+let
+    Fonte = stage_participacao_agricultura_familiar,
+
+    // 1) Ajuste de tipos e percentuais (seu código existente)
+    #"Tipo Alterado para Números" = Table.TransformColumnTypes(
+        Fonte,
+        {
+            {"COD", Int64.Type},
+            {"DESCRICAO", type text},
+            {"Tipo_alimento#(lf)", type text},
+            {"Tipo_producao", type text},
+            {"Participacao_AF_2017", type number},
+            {"Participacao_AF_2006", type number}
+        }
+    ),
+    #"Valor Substituído" = Table.ReplaceValue(
+        #"Tipo Alterado para Números",
+        null,
+        "Sem Informação",
+        Replacer.ReplaceValue,
+        {"Tipo_producao"}
+    ),
+    #"Transformar em Percentual" = Table.TransformColumns(
+        #"Valor Substituído",
+        {
+            {"Participacao_AF_2017", each _ / 100, Percentage.Type},
+            {"Participacao_AF_2006", each _ / 100, Percentage.Type}
+        }
+    ),
+    #"Colunas Renomeadas" = Table.RenameColumns(
+        #"Transformar em Percentual",
+        {{"COD", "id_categoria"}}
+    ),
+
+    // 2) **Mescla** com a tabela de classificação auxiliar
+    #"Merge Classificacao" = Table.NestedJoin(
+        #"Colunas Renomeadas",           // tabela de origem
+        "id_categoria",                  // coluna-chave na tabela de origem
+        classificacao_auxiliar,          // tabela de classificação já carregada
+        "id_categoria",                  // coluna-chave na tabela de classificação
+        "classif",                       // nome da coluna que receberá a tabela aninhada
+        JoinKind.LeftOuter               // tipo de junção (mantém todos da esquerda)
+    ),
+
+    // 3) **Expande** os campos que você quiser da classificação
+    #"Expand Classificacao" = Table.ExpandTableColumn(
+        #"Merge Classificacao",
+        "classif",                       // coluna aninhada
+        {"nome", "id_pai", "nivel"},     // colunas a extrair
+        {"nome_categoria", "id_pai", "nivel_categoria"}  
+    )
+in
+    #"Expand Classificacao"

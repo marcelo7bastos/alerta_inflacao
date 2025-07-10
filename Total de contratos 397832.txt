@@ -1,0 +1,3 @@
+Total de contratos: 397832
+Valor total dos contratos: 13416754569.150002
+Quantidade de CPFs únicos: 243958
