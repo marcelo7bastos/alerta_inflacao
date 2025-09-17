@@ -3,7 +3,8 @@ import re
 import requests
 import xml.etree.ElementTree as ET
 import pandas as pd
-from typing import List, Dict, Any
+from datetime import date
+from typing import List, Dict, Any, Optional
 import streamlit as st
 
 ### Funcionamento da API da OpenAI
@@ -242,63 +243,93 @@ from PIL import Image
 
 # Stopwords padrão do NLTK para o português com complementos
 
-def gerar_nuvem_palavras(csv_path: str, stopwords_path: str = None, mask_path: str = None) -> WordCloud:
-    """
-    Lê o CSV, filtra os artigos que abordam a inflação, processa os textos
+def gerar_nuvem_palavras(
+    csv_path: str,
+    stopwords_path: str = None,
+    mask_path: str = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None
+) -> WordCloud:
+    '''
+    Le o CSV, filtra os artigos que abordam a inflacao, processa os textos
     e gera uma WordCloud estilizada.
-    
-    Parâmetros:
-    - csv_path: caminho para o CSV de notícias.
+
+    Parametros:
+    - csv_path: caminho para o CSV de noticias.
     - stopwords_path: caminho para um arquivo de stopwords customizado (opcional).
-    - mask_path: caminho para uma imagem que servirá de máscara para a nuvem (opcional).
-    
+    - mask_path: caminho para uma imagem que servira de mascara para a nuvem (opcional).
+    - start_date: data inicial para filtrar as noticias (opcional).
+    - end_date: data final para filtrar as noticias (opcional).
+
     Retorna:
     - Um objeto WordCloud.
-    """
-    # Lê o CSV
+    '''
     df = pd.read_csv(csv_path, dtype=str)
-    
-    if "1. O artigo aborda o tema da inflação?" not in df.columns:
-        raise ValueError("Coluna '1. O artigo aborda o tema da inflação?' não encontrada no CSV.")
-    
-    # Filtra os artigos relevantes
-    df_filtrado = df[df["1. O artigo aborda o tema da inflação?"] == "Sim"]
-    
-    # Extrai textos (títulos e, se disponível, descrições)
+
+    if start_date or end_date:
+        if "pub_date" not in df.columns:
+            raise ValueError("Coluna 'pub_date' nao encontrada no CSV.")
+        pub_dates = pd.to_datetime(df["pub_date"], errors='coerce', utc=True).dt.date
+        mask_datas = pub_dates.notna()
+        if start_date:
+            mask_datas &= pub_dates >= start_date
+        if end_date:
+            mask_datas &= pub_dates <= end_date
+        df = df[mask_datas]
+
+    if df.empty:
+        raise ValueError("Nenhuma noticia encontrada para o periodo selecionado.")
+
+    coluna_inflacao = next(
+        (col for col in df.columns if col.lower().startswith("1. o artigo aborda o tema da infl")),
+        None
+    )
+
+    if not coluna_inflacao:
+        raise ValueError("Coluna relacionada ao tema da inflacao nao encontrada no CSV.")
+
+    df_filtrado = df[df[coluna_inflacao] == "Sim"]
+
+    if df_filtrado.empty:
+        raise ValueError("Nenhuma noticia relevante encontrada para o periodo selecionado.")
+
     textos = df_filtrado["title"].tolist()
     if "description" in df_filtrado.columns:
         textos += df_filtrado["description"].dropna().tolist()
-    
+
     texto_completo = " ".join(textos).lower()
     texto_sem_pontuacao = texto_completo.translate(str.maketrans("", "", string.punctuation))
-    
-    # Carrega as stopwords customizadas, se o caminho for fornecido, ou usa as do NLTK
+
     if stopwords_path and os.path.exists(stopwords_path):
         stopwords_pt = carregar_stopwords(stopwords_path)
     else:
         stopwords_pt = set(stopwords.words('portuguese'))
-    
+
     palavras_filtradas = [palavra for palavra in texto_sem_pontuacao.split() if palavra not in stopwords_pt]
     texto_final = " ".join(palavras_filtradas)
-    
-    # Se for fornecida uma máscara, carrega-a; caso contrário, mask fica como None
+
     mask = None
     if mask_path and os.path.exists(mask_path):
         mask = np.array(Image.open(mask_path))
-    
-    # Cria a nuvem de palavras com personalizações estéticas
+
     wordcloud = WordCloud(
         width=800,
         height=400,
-        background_color='white',  # ou None se preferir fundo transparente
+        background_color='white',
         colormap='Reds',
         mask=mask,
         contour_width=1,
         contour_color='steelblue',
         collocations=False
     ).generate(texto_final)
-    
+
     return wordcloud
+
+
+
+
+
+
 
 
 ##### Nuvem de palavras #####
