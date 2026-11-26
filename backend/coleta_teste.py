@@ -52,7 +52,7 @@ def gerar_linhas(candidatas, urls_historico, produtos):
     termos.update(produto.strip() for produto in produtos if produto and produto.strip())
     termos = sorted(termos, key=lambda termo: (-len(termo), termo))
     por_termo = {normalizar_texto(termo): termo for termo in termos}
-    padrao_produto = re.compile(r"\b(?:" + "|".join(map(re.escape, por_termo)) + r")\b")
+    padrao_produto = re.compile(r"(?<!\w)(?:" + "|".join(map(re.escape, por_termo)) + r")(?!\w)")
     urls_lote = set()
 
     for noticia in candidatas:
@@ -103,7 +103,7 @@ def executar(diretorio_saida):
     linhas = list(gerar_linhas(candidatas, urls_historico, produtos))
     diretorio_saida.mkdir(parents=True, exist_ok=True)
     with (diretorio_saida / "coleta-teste.csv").open("w", encoding="utf-8-sig", newline="") as arquivo:
-        escritor = csv.DictWriter(arquivo, fieldnames=COLUNAS)
+        escritor = csv.DictWriter(arquivo, fieldnames=COLUNAS, delimiter=";")
         escritor.writeheader()
         for linha in linhas:
             escritor.writerow({campo: celula_csv(valor) for campo, valor in linha.items()})

@@ -58,9 +58,9 @@ def search_keywords_in_rss(feed_urls, keywords, informacoes_feeds=None):
     matches = []
     headers = {'User-Agent': 'Mozilla/5.0 (compatible; RSSBot/1.0)'}
 
-    # Pré-compila expressões regulares para cada keyword
+    # Delimita por caracteres de palavra, inclusive quando o termo termina em pontuação.
     keyword_patterns = {
-        keyword: re.compile(rf'\b{re.escape(keyword.lower())}\b', re.IGNORECASE)
+        keyword: re.compile(rf'(?<!\w){re.escape(keyword.lower())}(?!\w)', re.IGNORECASE)
         for keyword in keywords
     }
 

@@ -18,6 +18,8 @@ class ColetaTeste(unittest.TestCase):
         self.assertTrue(all(None not in linha and all(linha.values()) for linha in linhas))
         subitens = {linha["categoria_subitem"] for linha in linhas}
         self.assertTrue({"Arroz", "Fava", "Feijão - branco"} <= subitens)
+        self.assertIn("Feijão - carioca (rajado)", subitens)
+        self.assertNotIn("Feijão - carioca (rajado))", subitens)
 
     def test_coleta_usa_dicionario_e_preserva_historico(self):
         rss = b"""<rss><channel>
@@ -25,6 +27,8 @@ class ColetaTeste(unittest.TestCase):
                 <link>https://example.com/arroz?utm_source=teste&amp;id=1</link></item>
             <item><title>Preco do arroz sobe</title>
                 <link>https://example.com/arroz?id=1#noticia</link></item>
+            <item><title>Preco da mandioca (aipim) sobe; veja</title>
+                <link>https://example.com/mandioca</link></item>
             <item><title>Fed comenta inflacao</title><description>IPCA</description>
                 <link>https://example.com/fed</link></item>
         </channel></rss>"""
@@ -48,17 +52,21 @@ class ColetaTeste(unittest.TestCase):
             self.assertEqual(acervo.read_bytes(), antes)
 
             with (saida / "coleta-teste.csv").open(encoding="utf-8-sig", newline="") as arq:
-                linhas = list(csv.DictReader(arq))
+                csv_exportado = csv.DictReader(arq, delimiter=";")
+                self.assertEqual(csv_exportado.fieldnames, list(coleta_teste.COLUNAS))
+                linhas = list(csv_exportado)
             resumo = json.loads((saida / "resumo.json").read_text(encoding="utf-8"))
 
         self.assertEqual([linha["situacao_url"] for linha in linhas], [
-            "nova", "repetida_no_lote", "ja_no_historico",
+            "nova", "repetida_no_lote", "nova", "ja_no_historico",
         ])
         self.assertEqual([linha["triagem"] for linha in linhas], [
-            "priorizar_revisao", "priorizar_revisao", "revisar_contexto",
+            "priorizar_revisao", "priorizar_revisao", "priorizar_revisao", "revisar_contexto",
         ])
+        self.assertEqual(linhas[2]["titulo"], "Preco da mandioca (aipim) sobe; veja")
+        self.assertEqual(linhas[2]["indicio_no_titulo"], "Mandioca (aipim)")
         self.assertEqual([fonte["status"] for fonte in resumo["feeds"]], ["ok", "falha_http"])
-        self.assertEqual(resumo["candidatas"], 3)
+        self.assertEqual(resumo["candidatas"], 4)
 
 
 if __name__ == "__main__":
