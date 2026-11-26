@@ -22,6 +22,22 @@ def get_feed_name(feed_url: str) -> str:
         return "Folha"
     elif "bbc.com" in feed_url_lower:
         return "BBC"
+    elif "cnnbrasil.com.br" in feed_url_lower:
+        return "CNN Brasil"
+    elif "agenciabrasil.ebc.com.br" in feed_url_lower:
+        return "Agência Brasil"
+    elif "agenciadenoticias.ibge.gov.br" in feed_url_lower:
+        return "Agência de Notícias do IBGE"
+    elif "gov.br/conab" in feed_url_lower:
+        return "Conab"
+    elif "fao.org" in feed_url_lower:
+        return "FAO"
+    elif "sbtnews.sbt.com.br" in feed_url_lower:
+        return "SBT News"
+    elif "argusmedia.com" in feed_url_lower:
+        return "Argus Media"
+    elif "reuters.com" in feed_url_lower:
+        return "Reuters"
     elif "exame.com" in feed_url_lower:
         return "Exame"
     elif "cartacapital.com.br" in feed_url_lower:

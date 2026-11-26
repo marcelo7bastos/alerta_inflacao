@@ -7,6 +7,7 @@ from backend.utils import render_footer
 
 st.set_page_config(page_title="Histórico de Notícias", layout="wide")
 st.title("Histórico de Notícias")
+st.caption("A cobertura depende das fontes consultadas. O período filtra pela data de publicação.")
 
 noticias = filtrar_historico(ler_historico(), somente_alimentos())
 datas = noticias["data_local"].dt.date.dropna()
