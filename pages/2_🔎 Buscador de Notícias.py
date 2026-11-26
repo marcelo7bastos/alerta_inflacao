@@ -1,96 +1,93 @@
-import streamlit as st
-from backend.services import (
-    load_keywords_from_csv, 
-    get_default_keywords, 
-    search_keywords_in_rss, 
-    classificar_artigo, 
-    get_feed_name
-)
+import os
 
+import pandas as pd
+import streamlit as st
+
+from backend.atualiza_noticias import chave_noticia, coletar_noticias
+from backend.interface_noticias import mostrar_noticias, somente_alimentos
+from backend.noticias import (
+    CAMPOS_CLASSIFICACAO,
+    COLUNAS_NOTICIA,
+    HISTORICO_CSV,
+    ClassificacaoIndisponivel,
+    buscar_texto,
+    classificar_artigo,
+    criar_cliente_openai,
+    datas_publicacao,
+    filtrar_historico,
+    ler_historico,
+    tem_classificacao,
+)
 from backend.utils import render_footer
 
-# Configura a página se necessário (opcional, pois o Streamlit configura automaticamente)
-st.set_page_config(page_title="Monitor de Notícias - Inflação de Alimentos", layout="wide")
 
-st.title("📰 Monitor de Notícias - Inflação de Alimentos")
+@st.cache_data(ttl=600, show_spinner=False)
+def consultar_feeds(versao_historico):
+    historico = ler_historico()
+    classificados = {
+        chave_noticia(noticia): noticia
+        for noticia in historico.to_dict("records")
+        if tem_classificacao(noticia)
+    }
+    try:
+        chave = st.secrets["openai"]["api_key"]
+    except (KeyError, FileNotFoundError):
+        chave = os.getenv("OPENAI_API_KEY")
+    cliente = criar_cliente_openai(chave) if chave else None
 
-# Sidebar para descrição do projeto (caso queira manter)
-# st.sidebar.markdown(
-#     """
-#     ## Sobre o Projeto
-#     Este aplicativo monitora notícias sobre inflação de alimentos a partir de diversos feeds RSS.
-#     Utilizando um conjunto de palavras-chave, o sistema filtra e exibe somente as notícias relevantes.
-#     """
-# )
-
-# Carrega as keywords
-csv_path = "data/keywords/ipca_alimentacao_bebidas.csv"
-try:
-    additional_keywords = load_keywords_from_csv(csv_path)
-except Exception as e:
-    additional_keywords = []
-
-default_keywords = get_default_keywords()
-keywords = list(set(default_keywords + additional_keywords))
-
-# Lista de Feeds
-rss_feeds = [
-    'https://g1.globo.com/rss/g1/',
-    'https://feeds.folha.uol.com.br/emcimadahora/rss091.xml',
-    'https://www.bbc.com/portuguese/index.xml',
-    'https://exame.com/feed/',
-    'https://www.cartacapital.com.br/feed/',
-    'https://www.istoedinheiro.com.br/feed/',
-    'https://www.infomoney.com.br/feed/',
-    'https://www.jovempan.com.br/feed',
-    'https://economia.ig.com.br/rss.xml',
-]
-
-if st.button("🔍 Buscar Notícias"):
-    message_placeholder = st.empty()
-    message_placeholder.info("Buscando notícias, por favor aguarde...")
-
-    resultados = search_keywords_in_rss(rss_feeds, keywords)
-    
-    # Chamada da classificação para aprimorar os artigos
-    for item in resultados:
-        item = classificar_artigo(item)
-    
-    message_placeholder.empty()
-
-    if resultados:
-        total = len(resultados)
-        filtered_count = sum(1 for artigo in resultados if artigo.get("1. O artigo aborda o tema da inflação?") == "Sim")
-        st.success(
-            f"Encontramos {total} notícias relevantes e nossa IA selecionou com precisão as {filtered_count} que realmente abordam a inflação de alimentos!"
-        )
-        # Agrupamento por veículo
-        grouped_results = {}
-        for item in resultados:
-            feed_name = get_feed_name(item['feed_url'])
-            if feed_name not in grouped_results:
-                grouped_results[feed_name] = []
-            grouped_results[feed_name].append(item)
-        # Exibe os resultados de forma organizada
-        for feed_name, items in grouped_results.items():
-            with st.expander(feed_name, expanded=False):
-                found = False
-                for i in items:
-                    if i.get("1. O artigo aborda o tema da inflação?") == "Sim":
-                        found = True
-                        st.markdown(f"**Título:** {i['title']}")
-                        st.write(f"Link: {i['link']}")
-                        st.write(f"Fonte: {i['feed_url']}")
-                        st.write(f"Data de publicação: {i['pub_date']}")
-                        st.write(f"Palavra-chave: {i['matched_keyword']}")
-                        st.write(f"1. O artigo aborda o tema da inflação? {i['1. O artigo aborda o tema da inflação?']}")
-                        st.write(f"2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral? {i['2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral?']}")
-                        st.write(f"3. O artigo aborda especificamente a inflação de alimentos? {i['3. O artigo aborda especificamente a inflação de alimentos?']}")
-                        st.write(f"4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor? {i['4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor?']}")
-                        st.write("---")
-                if not found:
-                    st.warning("Nenhuma notícia sobre inflação de alimentos encontrada.")
+    fontes = []
+    candidatas = coletar_noticias(fontes)
+    resultado = {}
+    for noticia in candidatas:
+        if not noticia["title"]:
+            continue
+        identificador = chave_noticia(noticia)
+        if identificador in resultado:
+            continue
+        anterior = classificados.get(identificador)
+        if anterior:
+            noticia.update({coluna: anterior.get(coluna, "") for coluna in CAMPOS_CLASSIFICACAO.values()})
+        elif cliente:
+            try:
+                noticia.update(classificar_artigo(noticia, cliente) or {})
+            except ClassificacaoIndisponivel:
+                cliente = None
+        resultado[identificador] = noticia
+    colunas = [*COLUNAS_NOTICIA, *CAMPOS_CLASSIFICACAO.values()]
+    return pd.DataFrame(resultado.values(), columns=colunas).fillna(""), fontes
 
 
-# Exibe o rodapé chamando a função
+st.set_page_config(page_title="Buscador de Notícias", layout="wide")
+st.title("Buscador de Notícias")
+
+alimentos = somente_alimentos()
+termo = st.text_input("Buscar no título ou no resumo", placeholder="Ex.: arroz, estiagem, supermercado")
+historico_tab, feeds_tab = st.tabs(("Acervo publicado", "Feeds RSS"))
+
+with historico_tab:
+    mostrar_noticias(filtrar_historico(ler_historico(), alimentos, termo))
+
+with feeds_tab:
+    if st.button("Consultar feeds agora"):
+        try:
+            versao = HISTORICO_CSV.stat().st_mtime_ns
+        except FileNotFoundError:
+            versao = None
+        with st.spinner("Consultando fontes e classificando os itens novos…"):
+            st.session_state["consulta_rss"] = consultar_feeds(versao)
+
+    if "consulta_rss" in st.session_state:
+        resultados, fontes = st.session_state["consulta_rss"]
+        indisponiveis = [fonte["feed"] for fonte in fontes if fonte["status"] != "ok"]
+        if indisponiveis:
+            st.warning("Fontes indisponíveis nesta consulta: " + ", ".join(indisponiveis))
+        sem_rotulo = ~resultados.apply(tem_classificacao, axis=1).astype(bool)
+        pendentes = buscar_texto(resultados[sem_rotulo], termo).copy()
+        if not pendentes.empty:
+            st.info(f"{len(pendentes)} candidatas aguardam classificação.")
+        mostrar_noticias(filtrar_historico(resultados, alimentos, termo))
+        if not pendentes.empty and st.toggle("Mostrar candidatas pendentes"):
+            pendentes["data_local"] = datas_publicacao(pendentes["pub_date"])
+            mostrar_noticias(pendentes.sort_values("data_local", ascending=False))
+
 render_footer()

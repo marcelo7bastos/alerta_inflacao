@@ -1,6 +1,7 @@
 import streamlit as st
 from backend.utils import render_footer
 from backend.services import gerar_nuvem_palavras
+from backend.noticias import datas_publicacao
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -23,13 +24,12 @@ Utilize o menu à esquerda para navegar entre as páginas:
 """)
 
 
-@st.cache_data(show_spinner=False)
 def carregar_intervalo_datas(caminho_csv: str):
     try:
         df = pd.read_csv(caminho_csv, usecols=["pub_date"], dtype=str)
     except (FileNotFoundError, ValueError):
         return None, None
-    datas = pd.to_datetime(df["pub_date"], errors="coerce", utc=True).dropna()
+    datas = datas_publicacao(df["pub_date"]).dropna()
     if datas.empty:
         return None, None
     return datas.min().date(), datas.max().date()

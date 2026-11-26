@@ -9,13 +9,12 @@ from collections import Counter
 from datetime import datetime, timezone
 from html import unescape
 from pathlib import Path
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .atualiza_noticias import KEYWORDS_CSV, KEYWORDS_PADRAO, RSS_FEEDS
 from .atualiza_noticias import load_keywords_from_csv, search_keywords_in_rss
+from .noticias import HISTORICO_CSV as HISTORICO, chave_url
 
 
-HISTORICO = Path("data/noticias/noticias.csv")
 COLUNAS = (
     "titulo", "url", "data_publicacao", "feed", "termo_coleta",
     "situacao_url", "triagem", "indicio_no_titulo",
@@ -27,24 +26,6 @@ TERMOS_PRECO = re.compile(r"\b(?:precos?|inflacao|ipca|encarec\w*|barate\w*)\b")
 def normalizar_texto(texto):
     decomposto = unicodedata.normalize("NFKD", unescape(texto or "").casefold())
     return "".join(letra for letra in decomposto if not unicodedata.combining(letra))
-
-
-def chave_url(url):
-    try:
-        partes = urlsplit((url or "").strip())
-        if partes.scheme not in {"http", "https"} or not partes.hostname:
-            return ""
-    except ValueError:
-        return ""
-
-    parametros = [
-        (nome, valor)
-        for nome, valor in parse_qsl(partes.query, keep_blank_values=True)
-        if not nome.lower().startswith("utm_") and nome.lower() not in {"fbclid", "gclid"}
-    ]
-    return urlunsplit((
-        partes.scheme, partes.netloc.lower(), partes.path or "/", urlencode(parametros), "",
-    ))
 
 
 def gerar_linhas(candidatas, urls_historico, produtos):
