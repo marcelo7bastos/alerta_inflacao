@@ -11,32 +11,39 @@ Descrição: Coleta novas notícias a partir de feeds RSS, atualiza o arquivo CS
 import os
 import re
 import time
-import requests
 import xml.etree.ElementTree as ET
+
 import pandas as pd
-from datetime import datetime
-
-##### CONFIGURAÇÃO DA API OPENAI #####
-from dotenv import load_dotenv
-import openai
-
-# Carrega as variáveis definidas em .env
-load_dotenv()
-
-# Obtém a chave da API da OpenAI
-api_key = os.getenv("OPENAI_API_KEY")
-if api_key is None:
-    raise ValueError("A chave da API da OpenAI não foi encontrada. Verifique seu arquivo .env.")
-
-# Inicializa o cliente da OpenAI
-client = openai.OpenAI(api_key=api_key)
-
-import re
 import requests
-import xml.etree.ElementTree as ET
-from dateutil import parser  # Biblioteca que facilita o parse de datas em formatos variados
+from dateutil import parser
 
-def search_keywords_in_rss(feed_urls, keywords):
+RSS_FEEDS = (
+    'https://g1.globo.com/rss/g1/',
+    'https://feeds.folha.uol.com.br/emcimadahora/rss091.xml',
+    'https://www.bbc.com/portuguese/index.xml',
+    'https://exame.com/feed/',
+    'https://www.cartacapital.com.br/feed/',
+    'https://www.istoedinheiro.com.br/feed/',
+    'https://www.infomoney.com.br/feed/',
+    'https://www.jovempan.com.br/feed',
+    'https://economia.ig.com.br/rss.xml',
+)
+KEYWORDS_CSV = 'data/keywords/ipca_alimentacao_bebidas.csv'
+KEYWORDS_PADRAO = ('inflação', 'preço dos alimentos', 'alta dos preços', 'IPCA', 'alimentação', 'bebidas')
+
+
+def criar_cliente_openai():
+    from dotenv import load_dotenv
+    import openai
+
+    load_dotenv()
+    api_key = os.getenv("OPENAI_API_KEY")
+    if api_key is None:
+        raise ValueError("A chave da API da OpenAI não foi encontrada. Verifique seu arquivo .env.")
+    return openai.OpenAI(api_key=api_key)
+
+
+def search_keywords_in_rss(feed_urls, keywords, informacoes_feeds=None):
     """
     Busca notícias nos feeds RSS que contenham as palavras-chave especificadas.
     
@@ -58,17 +65,27 @@ def search_keywords_in_rss(feed_urls, keywords):
     }
 
     for url in feed_urls:
+        status = {"feed": url, "status": "falha_requisicao", "itens": 0, "candidatas": 0}
+        if informacoes_feeds is not None:
+            informacoes_feeds.append(status)
         print(f"Analisando feed: {url}")
         try:
             response = requests.get(url, headers=headers, timeout=10)
+            status["http"] = response.status_code
             if response.status_code == 200:
                 try:
                     root = ET.fromstring(response.content)
                 except ET.ParseError as e:
+                    status["status"] = "xml_invalido"
                     print(f"Erro de parse XML no feed {url}: {e}")
                     continue
 
                 items = root.findall('.//item')
+                if root.tag != "rss" and not items:
+                    status["status"] = "formato_nao_suportado"
+                    print(f"Formato de feed não suportado: {url}")
+                    continue
+                status.update(status="ok", itens=len(items))
                 print(f"Foram encontrados {len(items)} itens no feed.")
 
                 for item in items:
@@ -100,8 +117,10 @@ def search_keywords_in_rss(feed_urls, keywords):
                                 'feed_url': url,
                                 'matched_keyword': keyword
                             })
+                            status["candidatas"] += 1
                             break  # evita duplicação
             else:
+                status["status"] = "falha_http"
                 print(f"Falha ao acessar feed: {url}, status: {response.status_code}")
         except requests.RequestException as e:
             print(f"Erro ao tentar acessar {url}: {e}")
@@ -178,7 +197,7 @@ def update_noticias_csv(resultados):
     return df
 
 ##### FUNÇÃO: Classificar artigo via API da OpenAI #####
-def classificar_artigo(artigo):
+def classificar_artigo(artigo, client):
     """
     Recebe um dicionário com os dados do artigo, invoca a API da OpenAI para classificação e retorna o artigo atualizado.
     """
@@ -233,7 +252,7 @@ def classificar_artigo(artigo):
     return artigo
 
 ##### FUNÇÃO: Processar classificação de artigos no CSV #####
-def processar_classificacao_csv():
+def processar_classificacao_csv(client):
     """
     Carrega o CSV 'data/noticias/noticias.csv', filtra os artigos não classificados (baseado na coluna 
     "1. O artigo aborda o tema da inflação?"), classifica cada artigo via API e atualiza o CSV.
@@ -266,7 +285,7 @@ def processar_classificacao_csv():
         if row[col_classificacao[0]] == "":
             artigo = row.to_dict()
             print(f"Classificando artigo: {artigo['title']}")
-            artigo_classificado = classificar_artigo(artigo)
+            artigo_classificado = classificar_artigo(artigo, client)
             
             for col in col_classificacao:
                 valor = artigo_classificado.get(col, "")
@@ -284,32 +303,10 @@ def processar_classificacao_csv():
 
 ##### EXECUÇÃO PRINCIPAL #####
 if __name__ == '__main__':
-    # Lista de feeds RSS
-    rss_feed_url = [
-        'https://g1.globo.com/rss/g1/',
-        'https://feeds.folha.uol.com.br/emcimadahora/rss091.xml',
-        'https://www.bbc.com/portuguese/index.xml',
-        'https://exame.com/feed/',
-        'https://www.cartacapital.com.br/feed/',
-        'https://www.istoedinheiro.com.br/feed/',
-        'https://www.infomoney.com.br/feed/',
-        'https://www.jovempan.com.br/feed',
-        'https://economia.ig.com.br/rss.xml',
-    ]
-    print("Feeds RSS:", rss_feed_url)
-    
-    # Carrega keywords adicionais a partir do CSV
-    keywords_csv = 'data/keywords/ipca_alimentacao_bebidas.csv'
-    keywords_adicionais = load_keywords_from_csv(keywords_csv)
-    
-    # Define as keywords já existentes e combina com as adicionais
-    keywords = ['inflação', 'preço dos alimentos', 'alta dos preços', 'IPCA', 'alimentação', 'bebidas']
-    keywords.extend(keywords_adicionais)
+    client = criar_cliente_openai()
+    print("Feeds RSS:", RSS_FEEDS)
+    keywords = [*KEYWORDS_PADRAO, *load_keywords_from_csv(KEYWORDS_CSV)]
     print("Palavras-chave utilizadas:", keywords)
-    
-    # Busca novas notícias e atualiza o CSV
-    resultados = search_keywords_in_rss(rss_feed_url, keywords)
-    df_atualizado = update_noticias_csv(resultados)
-    
-    # Processa a classificação dos artigos que ainda não foram avaliados pela IA
-    processar_classificacao_csv()
+    resultados = search_keywords_in_rss(RSS_FEEDS, keywords)
+    update_noticias_csv(resultados)
+    processar_classificacao_csv(client)
