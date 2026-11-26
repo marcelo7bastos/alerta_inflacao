@@ -86,6 +86,14 @@ class NoticiasTeste(unittest.TestCase):
             self.assertEqual(noticias.ler_historico(caminho)[noticias.INFLACAO].tolist(), ["", ""])
             cliente.chat.completions.create.assert_called_once()
 
+    def test_cota_da_api_tem_motivo_sem_detalhes_do_provedor(self):
+        cliente = Mock()
+        erro = OpenAIError("Detalhes internos")
+        erro.code = "insufficient_quota"
+        cliente.chat.completions.create.side_effect = erro
+        with self.assertRaisesRegex(noticias.ClassificacaoIndisponivel, "^Cota da API indisponível$"):
+            noticias.classificar_artigo({"title": "Preço do arroz"}, cliente)
+
 
 if __name__ == "__main__":
     unittest.main()

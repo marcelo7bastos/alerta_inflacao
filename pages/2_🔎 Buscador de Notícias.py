@@ -34,6 +34,7 @@ def consultar_feeds(versao_historico):
     except (KeyError, FileNotFoundError):
         chave = os.getenv("OPENAI_API_KEY")
     cliente = criar_cliente_openai(chave) if chave else None
+    falha_classificacao = None if cliente else "Chave da API ausente"
 
     fontes = []
     candidatas = coletar_noticias(fontes)
@@ -50,11 +51,12 @@ def consultar_feeds(versao_historico):
         elif cliente:
             try:
                 noticia.update(classificar_artigo(noticia, cliente) or {})
-            except ClassificacaoIndisponivel:
+            except ClassificacaoIndisponivel as erro:
+                falha_classificacao = str(erro)
                 cliente = None
         resultado[identificador] = noticia
     colunas = [*COLUNAS_NOTICIA, *CAMPOS_CLASSIFICACAO.values()]
-    return pd.DataFrame(resultado.values(), columns=colunas).fillna(""), fontes
+    return pd.DataFrame(resultado.values(), columns=colunas).fillna(""), fontes, falha_classificacao
 
 
 st.set_page_config(page_title="Buscador de Notícias", layout="wide")
@@ -74,16 +76,18 @@ with feeds_tab:
         except FileNotFoundError:
             versao = None
         with st.spinner("Consultando fontes e classificando os itens novos…"):
-            st.session_state["consulta_rss"] = consultar_feeds(versao)
+            st.session_state["resultado_consulta_rss"] = consultar_feeds(versao)
 
-    if "consulta_rss" in st.session_state:
-        resultados, fontes = st.session_state["consulta_rss"]
+    if "resultado_consulta_rss" in st.session_state:
+        resultados, fontes, falha_classificacao = st.session_state["resultado_consulta_rss"]
         indisponiveis = [fonte["feed"] for fonte in fontes if fonte["status"] != "ok"]
         if indisponiveis:
             st.warning("Fontes indisponíveis nesta consulta: " + ", ".join(indisponiveis))
         sem_rotulo = ~resultados.apply(tem_classificacao, axis=1).astype(bool)
         pendentes = buscar_texto(resultados[sem_rotulo], termo).copy()
         if not pendentes.empty:
+            if falha_classificacao:
+                st.warning(f"Classificação indisponível · {falha_classificacao}.")
             st.info(f"{len(pendentes)} candidatas aguardam classificação.")
         mostrar_noticias(filtrar_historico(resultados, alimentos, termo))
         if not pendentes.empty and st.toggle("Mostrar candidatas pendentes"):

@@ -139,7 +139,17 @@ def classificar_artigo(artigo, client):
             max_tokens=160,
         )
     except OpenAIError as erro:
-        raise ClassificacaoIndisponivel from erro
+        codigo = getattr(erro, "code", None)
+        status = getattr(erro, "status_code", None)
+        motivos = {
+            "insufficient_quota": "Cota da API indisponível",
+            "model_not_found": "Modelo indisponível para a conta",
+            "invalid_api_key": "Credencial da API recusada",
+        }
+        motivo = motivos.get(codigo)
+        if motivo is None:
+            motivo = f"A API respondeu com HTTP {status}" if isinstance(status, int) else "Falha de conexão com a API"
+        raise ClassificacaoIndisponivel(motivo) from erro
     if not resposta.choices or not resposta.choices[0].message.content:
         return None
     try:
