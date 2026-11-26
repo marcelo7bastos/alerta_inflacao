@@ -187,8 +187,8 @@ def atualizar_historico(caminho, candidatas, client=None):
                 if client:
                     try:
                         classificacao = noticias.classificar_artigo(noticia, client)
-                    except noticias.ClassificacaoIndisponivel:
-                        print("Classificador indisponível. As notícias restantes ficarão pendentes.")
+                    except noticias.ClassificacaoIndisponivel as erro:
+                        print(f"{erro}. As notícias restantes ficarão pendentes.")
                         client = None
                 if classificacao:
                     noticia.update(classificacao)
