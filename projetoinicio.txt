@@ -1,10 +1,20 @@
 
-##### Anotações:
-venv\Scripts\activate
-python .\backend\atualiza_noticias.py   
-git add . 
-git commit -m "atualização de dados 20250409"
-git push 
+##### Atualizar o histórico
+
+Da raiz do repositório, com OPENAI_API_KEY configurada no ambiente ou no arquivo .env:
+
+    python -m backend.atualiza_noticias
+
+A rotina mantém os rótulos já gravados e deixa as candidatas pendentes para uma nova tentativa se a API falhar.
+Para testar a coleta em uma cópia do CSV, indique seu caminho e use --somente-coleta.
+
+    python -m backend.atualiza_noticias --somente-coleta --historico caminho/para/copia.csv
+
+Depois de conferir a atualização destinada ao site, versionar somente o histórico.
+
+    git add -- data/noticias/noticias.csv
+    git commit -m "Atualiza histórico de notícias"
+    git push
 
 ###############
 

@@ -1,190 +1,19 @@
-# backend.py
-import re
-import requests
-import xml.etree.ElementTree as ET
-import pandas as pd
+"""Apresentação de veículos e nuvem de palavras do Streamlit."""
+
+import os
+import string
 from datetime import date
-from typing import List, Dict, Any, Optional
-import streamlit as st
+from typing import Optional
 
-### Funcionamento da API da OpenAI
-import openai
-# Atribui a chave de API dos secrets do Streamlit
-openai.api_key = st.secrets["openai"]["api_key"]
-client = openai
-###
+import numpy as np
+import pandas as pd
+from nltk.corpus import stopwords
+from PIL import Image
+from wordcloud import WordCloud
 
-
-def load_keywords_from_csv(csv_filepath: str) -> List[str]:
-    """
-    Lê o arquivo CSV com as colunas de palavras-chave e retorna uma lista única.
-    O CSV deve conter as colunas: 'categoria_grupo', 'categoria_subgrupo', 'categoria_item', 'categoria_subitem'.
-    """
-    df = pd.read_csv(csv_filepath)
-    keywords_adicionais = pd.unique(
-        df[['categoria_grupo', 'categoria_subgrupo', 'categoria_item', 'categoria_subitem']].values.ravel()
-    )
-    keywords_adicionais = [str(keyword).strip() for keyword in keywords_adicionais if pd.notna(keyword)]
-    return keywords_adicionais
-
-def get_default_keywords() -> List[str]:
-    """
-    Retorna uma lista padrão de palavras-chave.
-    """
-    return ['inflação', 'preço dos alimentos', 'alta dos preços', 'IPCA', 'alimentação', 'bebidas']
-
-def search_keywords_in_rss(feed_urls: List[str], keywords: List[str]) -> List[Dict[str, Any]]:
-    """
-    Busca notícias em feeds RSS que contenham as palavras-chave especificadas.
-
-    Args:
-        feed_urls: Lista de URLs de feeds RSS.
-        keywords: Lista de palavras-chave para a busca.
-
-    Returns:
-        Uma lista de dicionários com os dados das notícias encontradas.
-    """
-    matches = []
-    headers = {'User-Agent': 'Mozilla/5.0 (compatible; RSSBot/1.0)'}
-
-    # Pré-compila as expressões regulares com boundary \b para cada keyword
-    keyword_patterns = {
-        keyword: re.compile(rf'\b{re.escape(keyword.lower())}\b', re.IGNORECASE)
-        for keyword in keywords
-    }
-
-    for url in feed_urls:
-        print(f"Analisando feed: {url}")
-        try:
-            response = requests.get(url, headers=headers, timeout=10)
-            if response.status_code == 200:
-                try:
-                    root = ET.fromstring(response.content)
-                except ET.ParseError as e:
-                    print(f"Erro de parse XML no feed {url}: {e}")
-                    continue
-
-                items = root.findall('.//item')
-                print(f"Foram encontrados {len(items)} itens no feed {url}.")
-
-                for item in items:
-                    title = item.find('title').text if item.find('title') is not None else ""
-                    description = item.find('description').text if item.find('description') is not None else ""
-                    link = item.find('link').text if item.find('link') is not None else ""
-                    pub_date = item.find('pubDate').text if item.find('pubDate') is not None else ""
-                    content = f"{title} {description}".lower()
-
-                    for keyword, pattern in keyword_patterns.items():
-                        if pattern.search(content):
-                            matches.append({
-                                'title': title,
-                                'description': description,
-                                'link': link,
-                                'pub_date': pub_date,
-                                'feed_url': url,
-                                'matched_keyword': keyword
-                            })
-                            break  # Evita duplicação se mais de uma keyword casar
-            else:
-                print(f"Falha ao acessar feed: {url}, status: {response.status_code}")
-        except requests.RequestException as e:
-            print(f"Erro ao tentar acessar {url}: {e}")
-
-    return matches
+from .noticias import datas_publicacao
 
 
-
-# Usa a IA para Aprimorar o Resultado da Busca
-def classificar_artigo(artigo):
-    """
-    Função que recebe um dicionário com os dados do artigo e chama a API da OpenAI para classificar.
-    
-    Parâmetros do artigo (dicionário):
-      - title: título do artigo
-      - description: descrição do artigo
-      - link: link do artigo
-      - feed_url: fonte do artigo
-      - pub_date: data de publicação
-      - matched_keyword: palavra-chave que originou o artigo
-      
-    Retorna:
-      - O dicionário do artigo atualizado com as classificações extraídas da resposta da API.
-    """
-    # Mensagem do sistema com as instruções de classificação
-    system_message = (
-        "Como economista especializado em inflação de alimentos, sua tarefa é analisar artigos de jornais e classificá-los conforme as seguintes perguntas:\n"
-        "1. O artigo aborda o tema da inflação? (Responda com 'Sim' ou 'Não')\n"
-           "- Se 'Sim':\n"
-           "2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral? (Responda com 'Sim', 'Não' ou 'Não se aplica')\n"
-           "3. O artigo aborda especificamente a inflação de alimentos? (Responda com 'Sim', 'Não' ou 'Não se aplica')\n"
-              "- Se 'Sim':\n"
-              "4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor? (Responda com 'Sim', 'Não' ou 'Não se aplica')\n"
-        "Por favor, utilize apenas as palavras 'Sim', 'Não' ou 'Não se aplica' para responder a cada pergunta. Não é necessário justificar as respostas. \n"
-        "Em caso de informações insuficientes no artigo para responder a alguma pergunta, responda 'Não'. \n"
-        "Utilize apenas texto puro, sem aplicar estilos de formatação."
-    )
-    
-    # Mensagem do usuário com os dados do artigo
-    # user_message = (
-    #     f"Classifique:\n"
-    #     f"Título: {artigo['title']}\n"
-    #     f"Descrição: {artigo['description']}\n"
-    #     f"Link: {artigo['link']}\n"
-    #     f"Fonte: {artigo['feed_url']}\n"
-    #     f"Data de publicação: {artigo['pub_date']}\n"
-    #     f"Palavra-chave: {artigo['matched_keyword']}"
-    # )
-    user_message = (
-        f"Classifique:\n"
-        f"Título: {artigo['title']}\n"
-    )
-
-    
-    try:
-        resposta = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_message}
-            ],
-            temperature=0  # para respostas mais determinísticas
-        )
-        #print("Resposta da API:", resposta)
-    except Exception as e:
-        print("Erro ao chamar a API:", e)
-        return {}
-    
-    # Extrai o conteúdo da resposta
-    conteudo = resposta.choices[0].message.content
-    #print("Conteúdo da resposta:", conteudo)
-    
-    # Mapeamento das perguntas para suas respectivas chaves
-    perguntas = {
-        "1. O artigo aborda o tema da inflação?": None,
-        "2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral?": None,
-        "3. O artigo aborda especificamente a inflação de alimentos?": None,
-        "4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor?": None
-    }
-    
-    # Divide o conteúdo da resposta em linhas e preenche o dicionário de perguntas com as respostas correspondentes
-    for i, linha in enumerate(conteudo.strip().splitlines(), start=1):
-        resposta_linha = linha.split('. ', 1)[-1].strip()
-        chave_pergunta = list(perguntas.keys())[i - 1]
-        perguntas[chave_pergunta] = resposta_linha
-    
-    #imprimir o resultado
-    print("Respostas:", perguntas)        
-    
-    # Apensa os resultados (as classificações) ao dicionário do artigo
-    artigo.update(perguntas)
-    
-    # Retorna apenas o dicionário do artigo, já atualizado com as classificações
-    return artigo
-
-
-# ======================
-# 1) Função de nome de veículo
-# ======================
 def get_feed_name(feed_url: str) -> str:
     feed_url_lower = feed_url.lower()
     if "g1.globo.com" in feed_url_lower:
@@ -209,18 +38,6 @@ def get_feed_name(feed_url: str) -> str:
         return feed_url
 
 
-
-##### Nuvem de palavras #####
-import pandas as pd
-import string
-from wordcloud import WordCloud
-import nltk
-from nltk.corpus import stopwords
-import os
-
-# Se ainda não baixou as stopwords do NLTK, descomente a linha abaixo:
-# nltk.download('stopwords')
-
 def carregar_stopwords(caminho: str) -> set:
     """
     Carrega as stopwords de um arquivo, onde cada linha contém uma palavra.
@@ -232,16 +49,6 @@ def carregar_stopwords(caminho: str) -> set:
     except Exception as e:
         raise ValueError("Erro ao carregar stopwords do arquivo: " + str(e))
 
-import pandas as pd
-import string
-from wordcloud import WordCloud
-import nltk
-from nltk.corpus import stopwords
-import numpy as np
-from PIL import Image
-
-
-# Stopwords padrão do NLTK para o português com complementos
 
 def gerar_nuvem_palavras(
     csv_path: str,
@@ -269,7 +76,7 @@ def gerar_nuvem_palavras(
     if start_date or end_date:
         if "pub_date" not in df.columns:
             raise ValueError("Coluna 'pub_date' nao encontrada no CSV.")
-        pub_dates = pd.to_datetime(df["pub_date"], errors='coerce', utc=True).dt.date
+        pub_dates = datas_publicacao(df["pub_date"]).dt.date
         mask_datas = pub_dates.notna()
         if start_date:
             mask_datas &= pub_dates >= start_date
@@ -324,13 +131,3 @@ def gerar_nuvem_palavras(
     ).generate(texto_final)
 
     return wordcloud
-
-
-
-
-
-
-
-
-##### Nuvem de palavras #####
-# ======================

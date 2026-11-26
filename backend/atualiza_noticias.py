@@ -1,21 +1,22 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+"""Coleta RSS e atualiza o histórico de notícias."""
 
-"""
-Arquivo: atualiza_noticias.py
-Descrição: Coleta novas notícias a partir de feeds RSS, atualiza o arquivo CSV com as notícias encontradas
-           (evitando duplicatas) e, em seguida, classifica as notícias que ainda não foram avaliadas pela IA.
-"""
-
-##### IMPORTS GERAIS #####
+import argparse
 import os
 import re
-import time
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 import pandas as pd
 import requests
 from dateutil import parser
+
+if __package__:
+    from . import noticias
+else:
+    import noticias
+
 
 RSS_FEEDS = (
     'https://g1.globo.com/rss/g1/',
@@ -30,17 +31,6 @@ RSS_FEEDS = (
 )
 KEYWORDS_CSV = 'data/keywords/ipca_alimentacao_bebidas.csv'
 KEYWORDS_PADRAO = ('inflação', 'preço dos alimentos', 'alta dos preços', 'IPCA', 'alimentação', 'bebidas')
-
-
-def criar_cliente_openai():
-    from dotenv import load_dotenv
-    import openai
-
-    load_dotenv()
-    api_key = os.getenv("OPENAI_API_KEY")
-    if api_key is None:
-        raise ValueError("A chave da API da OpenAI não foi encontrada. Verifique seu arquivo .env.")
-    return openai.OpenAI(api_key=api_key)
 
 
 def search_keywords_in_rss(feed_urls, keywords, informacoes_feeds=None):
@@ -99,7 +89,7 @@ def search_keywords_in_rss(feed_urls, keywords, informacoes_feeds=None):
                         try:
                             dt_parsed = parser.parse(raw_pub_date)
                             pub_date = dt_parsed.isoformat()  # Ex: "2025-03-31T16:30:00-03:00"
-                        except (ValueError, TypeError):
+                        except (ValueError, TypeError, OverflowError):
                             # Se não conseguir fazer o parse, mantemos o texto original
                             pub_date = raw_pub_date
                     else:
@@ -140,173 +130,104 @@ def load_keywords_from_csv(csv_filepath):
     keywords_adicionais = [str(keyword).strip() for keyword in keywords_adicionais if pd.notna(keyword)]
     return keywords_adicionais
 
-##### FUNÇÃO: Atualizar CSV com novas notícias #####
-def update_noticias_csv(resultados):
-    """
-    Atualiza o arquivo CSV com novas notícias a partir da lista 'resultados', evitando duplicatas
-    e adicionando colunas para a classificação.
-    A chave de verificação é composta por (feed_url, pub_date, title).
-    """
-    # Define o caminho relativo do arquivo CSV
-    csv_filepath = os.path.join('data', 'noticias', 'noticias.csv')
-    # Garante que a pasta exista
-    os.makedirs(os.path.dirname(csv_filepath), exist_ok=True)
-    
-    # Colunas de classificação a serem incorporadas
-    classification_columns = [
-        "1. O artigo aborda o tema da inflação?",
-        "2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral?",
-        "3. O artigo aborda especificamente a inflação de alimentos?",
-        "4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor?"
-    ]
-    
-    # Carrega ou cria o DataFrame
-    if os.path.exists(csv_filepath):
-        df = pd.read_csv(csv_filepath)
-    else:
-        df = pd.DataFrame(columns=['title', 'description', 'link', 'pub_date', 'feed_url', 'matched_keyword'] + classification_columns)
-    
-    # Garante que as colunas de classificação existam
-    for col in classification_columns:
-        if col not in df.columns:
-            df[col] = ""
-    
-    # Cria um conjunto com a chave composta das notícias já existentes
-    existing_keys = set(df.apply(lambda row: (row['feed_url'], row['pub_date'], row['title']), axis=1))
-    new_entries = []
-    
-    for noticia in resultados:
-        composite_key = (noticia['feed_url'], noticia['pub_date'], noticia['title'])
-        if composite_key not in existing_keys:
-            # Inicializa as colunas de classificação com valor vazio
-            for col in classification_columns:
-                noticia[col] = ""
-            new_entries.append(noticia)
-            existing_keys.add(composite_key)
-        else:
-            print(f"Notícia já cadastrada: {noticia['title']}")
-    
-    if new_entries:
-        df_new = pd.DataFrame(new_entries)
-        df = pd.concat([df, df_new], ignore_index=True)
-        df.to_csv(csv_filepath, index=False)
-        print(f"{len(new_entries)} novas notícias adicionadas.")
-    else:
-        print("Nenhuma nova notícia foi encontrada para adicionar.")
-    
-    return df
 
-##### FUNÇÃO: Classificar artigo via API da OpenAI #####
-def classificar_artigo(artigo, client):
-    """
-    Recebe um dicionário com os dados do artigo, invoca a API da OpenAI para classificação e retorna o artigo atualizado.
-    """
-    system_message = (
-        "Como economista especializado em inflação de alimentos, sua tarefa é analisar artigos de jornais e classificar "
-        "conforme as seguintes perguntas:\n"
-        "1. O artigo aborda o tema da inflação? (Responda com 'Sim' ou 'Não')\n"
-           "- Se 'Sim':\n"
-           "2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral? "
-           "(Responda com 'Sim', 'Não' ou 'Não se aplica')\n"
-        "3. O artigo aborda especificamente a inflação de alimentos? (Responda com 'Sim', 'Não' ou 'Não se aplica')\n"
-           "- Se 'Sim':\n"
-           "4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor? "
-           "(Responda com 'Sim', 'Não' ou 'Não se aplica')\n"
-        "Por favor, utilize apenas as palavras 'Sim', 'Não' ou 'Não se aplica' para responder a cada pergunta. "
-        "Não é necessário justificar as respostas.\n"
-        "Em caso de informações insuficientes, responda 'Não'.\n"
-        "Retorne a resposta com cada linha correspondendo a uma pergunta."
+def coletar_noticias(informacoes_feeds=None):
+    palavras = [*KEYWORDS_PADRAO, *load_keywords_from_csv(KEYWORDS_CSV)]
+    return search_keywords_in_rss(RSS_FEEDS, palavras, informacoes_feeds)
+
+
+def chave_noticia(noticia):
+    return noticias.chave_url(noticia.get("link")) or (
+        noticia.get("feed_url"), noticia.get("pub_date"), noticia.get("title"),
     )
-    
-    user_message = f"Classifique:\nTítulo: {artigo['title']}\n"
-    
+
+
+def salvar_historico(caminho, linhas, colunas):
+    with NamedTemporaryFile(dir=caminho.parent, delete=False) as arquivo:
+        temporario = Path(arquivo.name)
     try:
-        resposta = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_message}
-            ],
-            temperature=0
-        )
-    except Exception as e:
-        print("Erro ao chamar a API:", e)
-        return {}
-    
-    conteudo = resposta.choices[0].message.content
-    
-    # Mapeia as perguntas para as chaves desejadas
-    perguntas = {
-        "1. O artigo aborda o tema da inflação?": None,
-        "2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral?": None,
-        "3. O artigo aborda especificamente a inflação de alimentos?": None,
-        "4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor?": None
-    }
-    
-    for i, linha in enumerate(conteudo.strip().splitlines(), start=1):
-        resposta_linha = linha.split('. ', 1)[-1].strip()
-        chave_pergunta = list(perguntas.keys())[i - 1]
-        perguntas[chave_pergunta] = resposta_linha
-    
-    artigo.update(perguntas)
-    return artigo
+        pd.DataFrame(linhas, columns=colunas).fillna("").to_csv(temporario, index=False, encoding="utf-8")
+        os.replace(temporario, caminho)
+    finally:
+        temporario.unlink(missing_ok=True)
 
-##### FUNÇÃO: Processar classificação de artigos no CSV #####
-def processar_classificacao_csv(client):
-    """
-    Carrega o CSV 'data/noticias/noticias.csv', filtra os artigos não classificados (baseado na coluna 
-    "1. O artigo aborda o tema da inflação?"), classifica cada artigo via API e atualiza o CSV.
-    """
-    csv_filepath = os.path.join('data', 'noticias', 'noticias.csv')
-    
-    if not os.path.exists(csv_filepath):
-        print("Arquivo CSV não encontrado:", csv_filepath)
-        return
-    
-    # Lê o CSV forçando todas as colunas como string
-    df = pd.read_csv(csv_filepath, dtype=str)
-    
-    col_classificacao = [
-        "1. O artigo aborda o tema da inflação?",
-        "2. O artigo apresenta uma perspectiva positiva para a economia, indicando uma queda na inflação geral?",
-        "3. O artigo aborda especificamente a inflação de alimentos?",
-        "4. O artigo apresenta uma perspectiva positiva para a inflação dos alimentos, indicando uma queda nesse setor?"
-    ]
-    
-    # Garante que as colunas de classificação existam e preenche valores ausentes
-    for col in col_classificacao:
-        if col not in df.columns:
-            df[col] = ""
-        else:
-            df[col] = df[col].fillna("").astype(str)
-    
-    # Itera apenas sobre os artigos ainda não classificados
-    for index, row in df.iterrows():
-        if row[col_classificacao[0]] == "":
-            artigo = row.to_dict()
-            print(f"Classificando artigo: {artigo['title']}")
-            artigo_classificado = classificar_artigo(artigo, client)
-            
-            for col in col_classificacao:
-                valor = artigo_classificado.get(col, "")
-                df.at[index, col] = str(valor)
-            
-            # Imprime o resultado da classificação para o artigo atual
-            print(f"Artigo '{artigo['title']}' classificado como:")
-            for col in col_classificacao:
-                print(f"  {col}: {df.at[index, col]}")
-            
-            time.sleep(1)
-    
-    df.to_csv(csv_filepath, index=False, encoding='utf-8')
-    print("Classificação atualizada no arquivo CSV.")
 
-##### EXECUÇÃO PRINCIPAL #####
-if __name__ == '__main__':
-    client = criar_cliente_openai()
-    print("Feeds RSS:", RSS_FEEDS)
-    keywords = [*KEYWORDS_PADRAO, *load_keywords_from_csv(KEYWORDS_CSV)]
-    print("Palavras-chave utilizadas:", keywords)
-    resultados = search_keywords_in_rss(RSS_FEEDS, keywords)
-    update_noticias_csv(resultados)
-    processar_classificacao_csv(client)
+def atualizar_historico(caminho, candidatas, client=None):
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    trava = caminho.with_name(f".{caminho.name}.lock")
+    try:
+        trava.touch(exist_ok=False)
+    except FileExistsError as erro:
+        raise RuntimeError(f"O histórico está bloqueado para atualização: {trava}") from erro
+
+    try:
+        historico = noticias.ler_historico(caminho)
+        colunas = list(dict.fromkeys([
+            *historico.columns, *noticias.COLUNAS_NOTICIA,
+            *noticias.CAMPOS_CLASSIFICACAO.values(), "collected_at",
+        ]))
+        linhas = historico.to_dict("records")
+        chaves = {chave_noticia(noticia) for noticia in linhas}
+        coletada_em = datetime.now(timezone.utc).isoformat()
+        adicionadas = 0
+        for noticia in candidatas:
+            if not noticia.get("title"):
+                continue
+            chave = chave_noticia(noticia)
+            if chave not in chaves:
+                linhas.append({**noticia, "collected_at": coletada_em})
+                chaves.add(chave)
+                adicionadas += 1
+
+        classificadas = 0
+        pendentes = 0
+        for noticia in linhas:
+            if not noticias.tem_classificacao(noticia):
+                classificacao = None
+                if client:
+                    try:
+                        classificacao = noticias.classificar_artigo(noticia, client)
+                    except noticias.ClassificacaoIndisponivel:
+                        print("Classificador indisponível. As notícias restantes ficarão pendentes.")
+                        client = None
+                if classificacao:
+                    noticia.update(classificacao)
+                    classificadas += 1
+                else:
+                    pendentes += 1
+
+        if adicionadas or classificadas:
+            salvar_historico(caminho, linhas, colunas)
+        return adicionadas, classificadas, pendentes
+    finally:
+        trava.unlink()
+
+
+def main():
+    cli = argparse.ArgumentParser(description=__doc__)
+    cli.add_argument("--historico", type=Path, default=noticias.HISTORICO_CSV)
+    cli.add_argument("--somente-coleta", action="store_true", help="Guardar candidatas para classificação posterior.")
+    args = cli.parse_args()
+
+    client = None
+    if not args.somente_coleta:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+        if not os.getenv("OPENAI_API_KEY"):
+            cli.error("Configure OPENAI_API_KEY ou use --somente-coleta para guardar notícias pendentes.")
+        client = noticias.criar_cliente_openai()
+
+    fontes = []
+    candidatas = coletar_noticias(fontes)
+    try:
+        novas, classificadas, pendentes = atualizar_historico(args.historico, candidatas, client)
+    except RuntimeError as erro:
+        cli.exit(1, f"{erro}\n")
+    quantas_ok = sum(fonte["status"] == "ok" for fonte in fontes)
+    print(f"{quantas_ok}/{len(fontes)} feeds lidos, {novas} novas, {classificadas} classificadas, {pendentes} pendentes.")
+    return 0 if quantas_ok and (client is None or not pendentes) else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
